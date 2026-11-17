@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import report
-from .config import SPORTS, US_REGULATED, Settings
+from .config import MY_BOOKS, SPORTS, US_REGULATED, Settings
 from .context import DemoContext, LiveContext, demo_games
 from .engine import analyze, dedupe_correlated, enrich
 from .history import FALLBACK_RATES, get_rates
@@ -44,8 +44,9 @@ def main(argv=None) -> int:
                    help="also tease -7.5/-8.5 favorites (lost money 2018-25; off by default)")
     s.add_argument("--markets", default="spreads,totals",
                    help="Odds API markets; each costs 1 credit per region (add h2h for moneylines)")
-    s.add_argument("--books", default=",".join(US_REGULATED),
-                   help="comma list of books you can bet at ('all' = any). Others are benchmark only")
+    s.add_argument("--books", default=",".join(MY_BOOKS),
+                   help="comma list of books you bet at ('us' = all US-regulated, 'all' = any). "
+                        "Others are benchmark only")
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
@@ -86,7 +87,8 @@ def load_rates(fetcher: Fetcher):
 def scan(a, p) -> int:
     st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
                   model_weight=a.model_weight, markets=a.markets,
-                  bet_books=None if a.books == "all" else tuple(b.strip() for b in a.books.split(",")))
+                  bet_books=(None if a.books == "all" else US_REGULATED if a.books == "us"
+                             else tuple(b.strip() for b in a.books.split(","))))
     now = datetime.now(timezone.utc)
     codes = [c.strip() for c in a.sports.split(",") if c.strip()]
     bad = [c for c in codes if c not in SPORTS]

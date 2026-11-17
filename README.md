@@ -96,6 +96,12 @@ CRON_TZ=America/New_York
 
 Data lives in `~/.betscan/snapshots.sqlite` (override with `BETSCAN_HOME`).
 
+## Books
+
+Picks and teasers only use DraftKings and FanDuel (`MY_BOOKS` in `config.py`). Every other
+book, Pinnacle especially, is used only to work out the fair price. Override per run with
+`--books draftkings,fanduel,betmgm`, `--books us` (all US-regulated) or `--books all`.
+
 ## Teasers
 
 The Odds API doesn't carry teaser prices, so give yours: `--teaser-price -120 --teaser3-price 160`.
