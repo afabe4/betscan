@@ -42,6 +42,8 @@ def main(argv=None) -> int:
     s.add_argument("--teaser3-price", type=float, default=160, help="your book's 3-team 6-pt teaser price")
     s.add_argument("--teaser-favs", action="store_true",
                    help="also tease -7.5/-8.5 favorites (lost money 2018-25; off by default)")
+    s.add_argument("--markets", default="spreads,totals",
+                   help="Odds API markets; each costs 1 credit per region (add h2h for moneylines)")
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
@@ -81,7 +83,7 @@ def load_rates(fetcher: Fetcher):
 
 def scan(a, p) -> int:
     st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
-                  model_weight=a.model_weight)
+                  model_weight=a.model_weight, markets=a.markets)
     now = datetime.now(timezone.utc)
     codes = [c.strip() for c in a.sports.split(",") if c.strip()]
     bad = [c for c in codes if c not in SPORTS]

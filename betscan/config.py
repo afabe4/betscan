@@ -44,7 +44,7 @@ KEY_POSITIONS = {
 class Settings:
     odds_api_key: str | None = field(default_factory=lambda: os.environ.get("ODDS_API_KEY"))
     regions: str = "us,eu"          # eu brings in Pinnacle
-    markets: str = "h2h,spreads,totals"
+    markets: str = "spreads,totals"  # moneylines off: 4 credits/scan instead of 6
     hours_ahead: int = 96           # only scan games starting within this window
     min_ev: float = 0.015           # 1.5% EV to call something a BET
     min_lean_score: float = 2.0     # situational score to call something a LEAN

@@ -76,8 +76,9 @@ context-only model sides logged as `MODEL`) is saved with the price at the time.
 A pick that upgrades (WATCH → BET) is re-logged at the price when it upgraded; downgrades don't
 overwrite it.
 
-A scan costs 6 Odds API credits (3 markets × 2 regions). This schedule is 9 scans a week
-(~235 credits/month, inside the free 500):
+A scan costs 4 Odds API credits (spreads + totals × US + EU regions; moneylines are off by
+default, add them with `--markets h2h,spreads,totals` for 6). This schedule is 9 scans a week
+(~155 credits/month, inside the free 500):
 
 ```cron
 CRON_TZ=America/New_York
@@ -111,6 +112,6 @@ different games are independent.
 - The only edge that holds up over time is **price**: beating the sharp line, and beating the closing line.
   Situational signals are heuristics with hand-set weights. They haven't been backtested; treat them as
   pointers for your own research.
-- Free Odds API tier = 500 credits/month. One scan costs (markets × regions) credits per sport, 6 at defaults.
+- Free Odds API tier = 500 credits/month. One scan costs (markets × regions) credits per sport, 4 at defaults.
 - ESPN endpoints are unofficial and may change; parsers fail soft (the signal is skipped, the scan goes on).
 - Check that sports betting is legal where you are. Bet only what you can afford to lose.
