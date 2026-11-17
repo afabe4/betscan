@@ -151,3 +151,20 @@ class NWSParse(unittest.TestCase):
         self.assertAlmostEqual(w["wind_mph"], 34 * 0.621371, places=1)   # mean of 30,36,36 km/h
         self.assertAlmostEqual(w["temp_f"], 32.0)
         self.assertAlmostEqual(w["precip_in"], 1.0 / 25.4, places=3)
+
+
+class Card(unittest.TestCase):
+    def test_demo_and_empty(self):
+        from datetime import datetime, timezone
+        from betscan.card import render
+        from betscan.config import Settings
+        with tempfile.TemporaryDirectory() as d:
+            st = Settings(cache_dir=Path(d))
+            now = datetime(2026, 12, 20, 15, tzinfo=timezone.utc)
+            demo = render(st, now, demo=True)
+            self.assertIn("Sample card", demo)
+            self.assertIn("Bet down to <b>138</b>", demo)      # Under: line getting lower is worse
+            self.assertIn("Bet up to <b>138.5</b>", demo)      # Over: line getting higher is worse
+            empty = render(st, now)
+            self.assertIn("No bets on the card right now", empty)
+            self.assertIn("No graded bets yet", empty)

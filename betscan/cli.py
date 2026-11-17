@@ -57,11 +57,15 @@ def main(argv=None) -> int:
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
+    s.add_argument("--card", type=Path, help="also write the bet card here")
     s.add_argument("--model-weight", type=float, default=0.0,
                    help="how much the efficiency model counts toward scores (default 0 = context only)")
     s.add_argument("--no-efficiency", action="store_true", help="skip efficiency models")
     s.add_argument("--no-store", action="store_true", help="don't record snapshots")
     sub.add_parser("review", help="grade past picks vs closing line and results")
+    cd = sub.add_parser("card", help="build the bet card from the latest scans and your record")
+    cd.add_argument("--out", type=Path, default=Path("card.html"))
+    cd.add_argument("--demo", action="store_true", help="sample card with made-up bets and record")
     sub.add_parser("angles", help="print historical rates behind the wind and teaser plays")
     r = sub.add_parser("ratings", help="print a sport's efficiency ratings")
     r.add_argument("sport", choices=list(SPORTS))
@@ -84,6 +88,17 @@ def main(argv=None) -> int:
         return show_angles(st)
     if a.cmd == "review":
         return run_review(st)
+    if a.cmd == "card":
+        from .card import render
+        if not a.demo:
+            try:
+                from .review import run
+                run(Store(st.db_path), Fetcher(st.cache_dir))   # grade anything finished first
+            except Exception as e:  # noqa: BLE001
+                _log(f"  [review] skipped: {e}")
+        a.out.write_text(render(st, datetime.now(timezone.utc), demo=a.demo))
+        print(f"Bet card: {a.out}")
+        return 0
     return scan(a, p)
 
 
@@ -159,6 +174,15 @@ def scan(a, p) -> int:
 
     if store:
         store.record_picks(all_cands, now, legs)
+    if not a.demo:
+        from . import slate
+        for code in codes:
+            slate.write(st.cache_dir / f"latest_{code}.json", code, all_cands, teasers, now, st.min_ev,
+                        fetcher.last_headers.get("x-requests-remaining"))
+    if a.card:
+        from .card import render
+        a.card.write_text(render(st, now, demo=a.demo))
+        _log(f"\nBet card: {a.card}")
     if a.json:
         a.json.write_text(report.to_json(all_cands))
     if a.html:

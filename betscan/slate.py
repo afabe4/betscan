@@ -1,0 +1,115 @@
+"""What a scan hands to the bet card: one JSON file per sport with plain-language picks.
+
+Each bet carries its limit: the worst number and price at which it is still a bet,
+so the card can say "bet down to 140.5" or "no worse than -115".
+"""
+from __future__ import annotations
+
+import json
+import math
+from datetime import datetime
+from pathlib import Path
+
+from .models import Candidate
+from .odds_math import decimal_to_american
+
+KIND_LABEL = {
+    "ncaab_model": "Totals model", "wind": "Wind under", "price": "Price edge",
+    "teaser": "Teaser", "injury": "Injury", "news": "News", "model": "Efficiency model",
+}
+
+
+def play_kind(c: Candidate) -> str:
+    kinds = {s.kind for s in c.signals}
+    if "ncaab_model" in kinds and c.market == "totals":
+        return "ncaab_model"
+    if "wind" in kinds and c.side == "Under":
+        return "wind"
+    return "price"
+
+
+def _limit_price(fair: float | None, min_ev: float) -> int | None:
+    """Worst American price that still clears min_ev at this fair probability."""
+    if not fair:
+        return None
+    dec = (1 + min_ev) / fair
+    if dec <= 1.01:
+        return None
+    return decimal_to_american(dec)
+
+
+def _limit_point(c: Candidate, model_total: float | None, min_edge: float) -> float | None:
+    if model_total is None or c.market != "totals":
+        return None
+    if c.side == "Over":     # need line <= model - edge; round down to a half point
+        return math.floor((model_total - min_edge) * 2) / 2
+    return math.ceil((model_total + min_edge) * 2) / 2
+
+
+def _model_total(c: Candidate) -> float | None:
+    for s in c.signals:
+        if s.kind == "ncaab_model" and s.detail.startswith("model total "):
+            try:
+                return float(s.detail.split()[2])
+            except ValueError:
+                return None
+    return None
+
+
+def reasons(c: Candidate) -> list[str]:
+    out = []
+    kind = play_kind(c)
+    if kind == "ncaab_model":
+        mt = _model_total(c)
+        gap = abs((mt or 0) - (c.point or 0))
+        out.append(f"Model total {mt:.1f}, {gap:.1f} pts {'above' if c.side == 'Over' else 'below'} the line.")
+        out.append(f"Backtested win rate at this gap: {c.fair_prob:.1%}.")
+    elif kind == "wind":
+        sig = next(s for s in c.signals if s.kind == "wind")
+        out.append(sig.detail.split(". ")[0].replace("forecast", "Forecast") + ".")
+        out.append(f"Under's fair chance after the wind adjustment: {c.fair_prob:.1%}.")
+    else:
+        ref = getattr(c, "ref_book", "the market")
+        ref = "Pinnacle" if ref == "pinnacle" else ref
+        out.append(f"{c.best_book.title() if c.best_book else 'Book'} beats {ref}'s no-vig line "
+                   f"(fair {c.fair_prob:.1%}).")
+    for s in c.signals:
+        if s.kind in ("injury", "news") and s.strength:
+            out.append(s.detail.split(" [")[0])
+        if s.kind == "ncaab_model" and "already moved" in s.detail:
+            out.append("The total has already moved this way, so you're not getting the opener.")
+    return out
+
+
+def bet_entry(c: Candidate, min_ev: float, min_edge: float = 3.0) -> dict:
+    mt = _model_total(c)
+    return {
+        "sport": c.game.sport, "tier": c.tier, "kind": play_kind(c), "game": c.game.label,
+        "home": c.game.home, "away": c.game.away, "commence": c.game.commence.isoformat(),
+        "market": c.market, "selection": c.selection, "side": c.side, "point": c.point,
+        "book": c.best_book, "price": c.best_price, "fair_prob": c.fair_prob, "ev": c.ev,
+        "stake": c.stake, "limit_price": _limit_price(c.fair_prob, min_ev),
+        "limit_point": _limit_point(c, mt, min_edge), "reasons": reasons(c),
+    }
+
+
+def watch_entry(c: Candidate) -> dict:
+    sig = next((s for s in c.signals if s.kind in ("ncaab_model", "line", "injury", "news", "wind", "model")), None)
+    note = sig.detail.split(" [")[0] if sig else ""
+    if c.tier == "VERIFY":
+        note = "Line is far from the market. Check it's live before betting. " + note
+    return {"sport": c.game.sport, "tier": c.tier, "game": c.game.label, "commence": c.game.commence.isoformat(),
+            "selection": c.selection, "book": c.best_book, "price": c.best_price, "ev": c.ev, "note": note[:220]}
+
+
+def write(path: Path, sport: str, cands: list[Candidate], teasers, now: datetime, min_ev: float,
+          credits_left: str | None):
+    bets = [bet_entry(c, min_ev) for c in cands if c.game.sport == sport and c.tier == "BET"]
+    watch = [watch_entry(c) for c in cands if c.game.sport == sport and c.tier in ("VERIFY", "LEAN", "WATCH")]
+    tz = [{"book": t.book, "price": t.price, "prob": t.prob, "ev": t.ev, "stake": t.stake,
+           "legs": [{"game": leg.game.label, "side": leg.side, "point": leg.point, "teased": leg.teased,
+                     "commence": leg.game.commence.isoformat()} for leg in t.legs]}
+          for t in teasers] if sport == "nfl" else []
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"sport": sport, "scanned_at": now.isoformat(), "credits_left": credits_left,
+                                "bets": bets, "teasers": tz, "watch": watch[:12]}, indent=1))
