@@ -94,7 +94,22 @@ def demo_games(now: datetime) -> dict[str, list[Game]]:
         "betrivers": _book(((-4.5, -112), (4.5, -108)), (229.5, -110, -110), (-170, 182), H, A),
         "fanduel": _book(((-5.0, -105), (5.0, -115)), (230.0, -112, -108), (-188, 158), H, A),
     }
-    return {"nfl": [g1, g2], "nba": [g3, g4]}
+    # 5/6) Teaser-eligible short dogs in modest totals.
+    g5 = Game("demo-nfl-3", "nfl", sun, "Green Bay Packers", "Chicago Bears")
+    H, A = g5.home, g5.away
+    g5.books = {
+        "pinnacle": _book(((-2.5, -107), (2.5, -103)), (44.5, -105, -105), (-135, 120), H, A),
+        "draftkings": _book(((-2.5, -110), (2.5, -110)), (44.5, -110, -110), (-140, 118), H, A),
+        "fanduel": _book(((-2.5, -112), (2.5, -108)), (45.0, -110, -110), (-138, 116), H, A),
+    }
+    g6 = Game("demo-nfl-4", "nfl", sun, "New York Jets", "Miami Dolphins")
+    H, A = g6.home, g6.away
+    g6.books = {
+        "pinnacle": _book(((1.5, -104), (-1.5, -106)), (41.0, -105, -105), (102, -118), H, A),
+        "draftkings": _book(((1.5, -110), (-1.5, -110)), (41.5, -110, -110), (100, -120), H, A),
+        "fanduel": _book(((2.0, -112), (-2.0, -108)), (41.0, -110, -110), (105, -125), H, A),
+    }
+    return {"nfl": [g1, g2, g5, g6], "nba": [g3, g4]}
 
 
 class DemoContext:
@@ -122,6 +137,8 @@ class DemoContext:
         venues = {
             "demo-nfl-1": ("Huntington Bank Field", "Cleveland", "OH", False),
             "demo-nfl-2": ("Allegiant Stadium", "Las Vegas", "NV", True),
+            "demo-nfl-3": ("Lambeau Field", "Green Bay", "WI", False),
+            "demo-nfl-4": ("MetLife Stadium", "East Rutherford", "NJ", False),
             "demo-nba-1": ("Madison Square Garden", "New York", "NY", True),
             "demo-nba-2": ("Ball Arena", "Denver", "CO", True),
         }

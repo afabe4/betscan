@@ -1,7 +1,7 @@
-"""SQLite snapshots of every scan, used to measure line movement over time.
+"""SQLite: line snapshots every scan, plus every pick for closing-line review.
 
-Run the scanner on a schedule (e.g. every 30-60 min) and the movement signal
-gets better: it can tell whether the market already reacted to a news story.
+Opening line = first snapshot of a game. Closing line = last snapshot before
+kickoff, so schedule a scan shortly before each kickoff window (see README).
 """
 from __future__ import annotations
 
@@ -16,19 +16,31 @@ CREATE TABLE IF NOT EXISTS lines (
 );
 CREATE INDEX IF NOT EXISTS lines_game ON lines(game_id, market, outcome, ts);
 CREATE TABLE IF NOT EXISTS picks (
-  ts TEXT, game_id TEXT, label TEXT, commence TEXT, market TEXT, selection TEXT,
-  book TEXT, price REAL, fair_prob REAL, ev REAL, score REAL, tier TEXT, stake REAL,
-  closing_price REAL, result TEXT
+  ts TEXT, game_id TEXT, sport TEXT, label TEXT, home TEXT, away TEXT, commence TEXT,
+  market TEXT, side TEXT, point REAL, selection TEXT, book TEXT, price REAL,
+  fair_prob REAL, ev REAL, score REAL, tier TEXT, stake REAL, kinds TEXT,
+  close_point REAL, close_price REAL, close_fair REAL, clv REAL,
+  result TEXT, profit REAL,
+  UNIQUE(game_id, market, side)
 );
 """
+# Lower = stronger. A pick that upgrades (WATCH -> BET) is re-recorded at the
+# price available when it upgraded; otherwise the first sighting is kept.
+TIER_RANK = {"BET": 0, "TEASER": 1, "VERIFY": 2, "ALT": 3, "LEAN": 4, "WATCH": 5, "MODEL": 6}
+PICK_COLS = ("ts", "game_id", "sport", "label", "home", "away", "commence", "market", "side", "point",
+             "selection", "book", "price", "fair_prob", "ev", "score", "tier", "stake", "kinds")
 
 
 class Store:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path)
+        cols = [r[1] for r in self.db.execute("PRAGMA table_info(picks)")]
+        if cols and "side" not in cols:      # pre-CLV schema: keep it, start fresh
+            self.db.execute("ALTER TABLE picks RENAME TO picks_v1")
         self.db.executescript(SCHEMA)
 
+    # --- lines ---------------------------------------------------------------
     def record_lines(self, games, ts: datetime):
         rows = []
         for g in games:
@@ -59,9 +71,60 @@ class Store:
             out.append((datetime.fromisoformat(ts), pts[len(pts) // 2] if pts else None, prs[len(prs) // 2]))
         return out
 
-    def record_picks(self, candidates, ts: datetime):
-        rows = [(ts.isoformat(), c.game.id, c.game.label, c.game.commence.isoformat(), c.market,
-                 c.selection, c.best_book, c.best_price, c.fair_prob, c.ev, c.score, c.tier, c.stake,
-                 None, None) for c in candidates if c.tier in ("BET", "LEAN")]
-        self.db.executemany("INSERT INTO picks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    def closing_snapshot(self, game_id: str, commence: str) -> dict[str, dict[str, list[tuple]]]:
+        """book -> market -> [(outcome, point, price)] at the last scan before kickoff."""
+        row = self.db.execute("SELECT MAX(ts) FROM lines WHERE game_id=? AND ts < ?",
+                              (game_id, commence)).fetchone()
+        if not row or not row[0]:
+            return {}
+        out: dict = {}
+        for book, market, outcome, point, price in self.db.execute(
+                "SELECT book, market, outcome, point, price FROM lines WHERE game_id=? AND ts=?",
+                (game_id, row[0])):
+            out.setdefault(book, {}).setdefault(market, []).append((outcome, point, price))
+        return out
+
+    # --- picks ---------------------------------------------------------------
+    def _upsert(self, row: dict):
+        cur = self.db.execute("SELECT tier FROM picks WHERE game_id=? AND market=? AND side=?",
+                              (row["game_id"], row["market"], row["side"])).fetchone()
+        if cur and TIER_RANK.get(cur[0], 9) <= TIER_RANK.get(row["tier"], 9):
+            return
+        if cur:
+            self.db.execute("DELETE FROM picks WHERE game_id=? AND market=? AND side=?",
+                            (row["game_id"], row["market"], row["side"]))
+        self.db.execute(f"INSERT INTO picks ({','.join(PICK_COLS)}) VALUES ({','.join('?' * len(PICK_COLS))})",
+                        [row[c] for c in PICK_COLS])
+
+    def record_picks(self, candidates, ts: datetime, teaser_legs=()):
+        for c in candidates:
+            tier = c.tier
+            kinds = sorted({s.kind for s in c.signals})
+            if tier == "PASS" and "model" in kinds:
+                tier = "MODEL"     # shadow pick: tracks the context-only model vs the close
+            if tier == "PASS":
+                continue
+            g = c.game
+            self._upsert(dict(ts=ts.isoformat(), game_id=g.id, sport=g.sport, label=g.label, home=g.home,
+                              away=g.away, commence=g.commence.isoformat(), market=c.market, side=c.side,
+                              point=c.point, selection=c.selection, book=c.best_book, price=c.best_price,
+                              fair_prob=c.fair_prob, ev=c.ev, score=c.score, tier=tier, stake=c.stake,
+                              kinds=",".join(kinds)))
+        for leg in teaser_legs:
+            g = leg.game
+            self._upsert(dict(ts=ts.isoformat(), game_id=g.id, sport=g.sport, label=g.label, home=g.home,
+                              away=g.away, commence=g.commence.isoformat(), market="teaser", side=leg.side,
+                              point=leg.point, selection=leg.label, book=leg.book, price=None,
+                              fair_prob=leg.prob, ev=None, score=None, tier="TEASER", stake=0,
+                              kinds="teaser"))
+        self.db.commit()
+
+    def picks(self, where: str = "1=1", args=()) -> list[dict]:
+        cur = self.db.execute(f"SELECT rowid, * FROM picks WHERE {where} ORDER BY commence", args)
+        names = [d[0] for d in cur.description]
+        return [dict(zip(names, r)) for r in cur.fetchall()]
+
+    def update_pick(self, rowid: int, **fields):
+        sets = ",".join(f"{k}=?" for k in fields)
+        self.db.execute(f"UPDATE picks SET {sets} WHERE rowid=?", [*fields.values(), rowid])
         self.db.commit()

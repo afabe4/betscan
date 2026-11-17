@@ -8,6 +8,7 @@ from .config import Settings, Sport
 from .models import Candidate, Game, Signal
 from .odds_math import kelly_fraction
 from .signals.price import _bettor_point, price_candidates
+from .signals.angles import wind_adjust
 from .signals.efficiency import efficiency_signals
 from .signals.situational import injury_signals, news_signals, rest_signals, weather_signals
 
@@ -93,16 +94,22 @@ def _attach(cands: dict, sig: Signal):
             other.against.append(sig)
 
 
-def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ratings=None) -> list[Candidate]:
+def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ratings=None,
+            rates=None) -> list[Candidate]:
     results = []
     for g in games:
         cands = {(c.market, c.side): c for c in price_candidates(g)}
-        sigs = (injury_signals(g, settings, now) + weather_signals(g, settings)
+        # NFL wind uses historical rates when available; the heuristic is the offline fallback.
+        wind = wind_adjust(g, cands, rates, now, _moved_toward(store, g, "totals", "Under"))
+        if wind:
+            _attach(cands, wind)
+        weather = [] if (rates is not None and g.sport == "nfl") else weather_signals(g, settings)
+        sigs = (injury_signals(g, settings, now) + weather
                 + rest_signals(g) + news_signals(g, settings, now)
                 + efficiency_signals(g, ratings, settings.model_weight))
         first_seen = store.first_seen(g.id) if store else None
         for sig in sigs:
-            if sig.kind == "model":
+            if sig.kind in ("model", "wind"):
                 _attach(cands, sig)
                 continue
             moved = _moved_toward(store, g, sig.market, sig.side)

@@ -16,8 +16,9 @@ python -m betscan scan --sports nfl,nba --html report.html    # live
 |---|---|---|
 | **price** | The Odds API (US + EU regions, which includes Pinnacle) | A book whose price beats the sharp book's no-vig fair probability (or the consensus if no sharp book). Different numbers are adjusted point by point, with NFL key numbers 3/7/10 weighted; those results are marked `approx`. |
 | **injury** | ESPN injuries | Key-position players (QB, SP, goalie, guards...) ruled Out/Doubtful in the last 48h. Older injuries are assumed priced in. |
-| **weather** | Open-Meteo at kickoff hour | Outdoor football with wind ≥15 mph, heavy precipitation, or ≤20°F → Under, small boost to the underdog. Cold MLB → Under. |
-| **rest** | ESPN team schedules | NBA/NHL back-to-back vs rested opponent; NFL/NCAAF rest gaps of 3+ days. |
+| **wind** (NFL) | Open-Meteo forecast at kickoff + nflverse history | Outdoor games forecast at 10+ mph. The Under's fair probability is raised by the historical under rate in that wind (54.8% at 10–14 mph, 56.4% at 15+ vs closing totals, 2006–25), discounted for forecast uncertainty (85% of the edge kept inside 24h, down to 40% at 4+ days). |
+| **teasers** (NFL) | nflverse history | 6-pt teaser legs on dogs of +1.5 to +2.5 in games totaled ≤48.5 (78.3% leg rate, 2006–25). Builds every +EV 2- and 3-team combo at the same book. |
+| **rest** | ESPN team schedules | NBA/NHL back-to-backs, NCAAF rest gaps. **Off for NFL**: rest edges covered 51.2%/50.1% (2006–17 / 2018–25), i.e. already priced. |
 | **news** | ESPN news | Recent headlines with negative keywords (suspended, ruled out, illness, fired...) about one team. |
 | **model** | per-sport efficiency (below) | Projected score → win/cover/over probability, compared with the market's fair price. Context only by default (see backtest). |
 | **movement** | Local SQLite snapshots | If the line already moved toward a signal since we first saw the game, that signal is cut 70% and marked "priced". |
@@ -60,12 +61,50 @@ haven't been backtested.
 - **LEAN**: situational score ≥ 2 with a roughly fair price. No stake suggested.
 - **WATCH** (`--all`): a situation worth a look, but the price has no edge.
 
-## Run it on a schedule
+## Run it on a schedule: opening lines, closing lines, and review
 
-The movement check only works once there's line history. Run every 30–60 minutes (cron) so the
-tool can tell "news broke and the line hasn't moved" (the real opportunity) apart from "news broke
-and the market already adjusted." Snapshots and logged picks are stored in `~/.betscan/snapshots.sqlite`
-(override with `BETSCAN_HOME`).
+Every scan stores every book's line. The first scan of a game is its **opening line**. The last
+scan before kickoff is its **closing line**. Every pick (BET, LEAN, WATCH, teaser legs, plus
+context-only model sides logged as `MODEL`) is saved with the price at the time.
+`python -m betscan review` then grades each pick:
+
+- **CLV**: your price vs the no-vig closing price at your number. Beating the close consistently
+  is the earliest reliable sign a signal works; it shows within ~100 bets, while W-L needs 1000+.
+- **Result** from nflverse final scores, with flat 1-unit ROI.
+- Broken out by tier and by signal (`signal wind`, `signal model`, `signal injury`, `tier TEASER`...).
+
+A pick that upgrades (WATCH → BET) is re-logged at the price when it upgraded; downgrades don't
+overwrite it.
+
+A scan costs 6 Odds API credits (3 markets × 2 regions). This schedule is 9 scans a week
+(~235 credits/month, inside the free 500):
+
+```cron
+CRON_TZ=America/New_York
+0 12 * * 2    cd ~/betscan && python3 -m betscan review >> ~/.betscan/review.log 2>&1
+5 12 * * 2    cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # openers
+0 12 * * 4    cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1
+50 19 * * 4   cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # TNF close
+0 12 * * 6    cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # forecasts firm up
+0 9 * * 0     cd ~/betscan && python3 -m betscan scan --html ~/betscan/report.html >> ~/.betscan/scan.log 2>&1
+40 12 * * 0   cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # 1pm close
+55 15 * * 0   cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # 4pm close
+5 20 * * 0    cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # SNF close
+55 19 * * 1   cd ~/betscan && python3 -m betscan scan >> ~/.betscan/scan.log 2>&1   # MNF close
+```
+
+Data lives in `~/.betscan/snapshots.sqlite` (override with `BETSCAN_HOME`).
+
+## Teasers
+
+The Odds API doesn't carry teaser prices, so give yours: `--teaser-price -120 --teaser3-price 160`.
+Break-even per leg is 73.9% at -120 but 75.2% at -130 and 76.5% at -140, so the price matters:
+at -140 the historical 78.3% leaves little margin. Some books stopped offering teasers through
+these numbers, or price them worse, for exactly this reason. `--teaser-favs` adds -7.5/-8.5
+favorites (73.0% overall, but 71.1% in 2018–25: below break-even). The combo EV assumes legs in
+different games are independent.
+
+`python -m betscan angles` prints the current historical rates.
 
 ## Caveats
 

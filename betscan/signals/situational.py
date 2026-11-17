@@ -99,7 +99,9 @@ def rest_signals(game: Game) -> list[Signal]:
             detail = f"{tired} on a back-to-back; {rested} has {hi:.0f} days rest"
             out.append(Signal("rest", "spreads", rested, 1.0, detail))
             out.append(Signal("rest", "h2h", rested, 1.0, detail))
-    elif game.sport in ("nfl", "ncaaf"):
+    elif game.sport == "ncaaf":
+        # NFL deliberately excluded: 2006-25 closing lines show rest edges of 3+ days
+        # covering 51.2% then 50.1%, i.e. fully priced.
         diff = hi - lo
         if diff >= 3:
             strength = round(min(1.5, 0.5 + 0.25 * (diff - 3)), 2)
