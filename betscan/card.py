@@ -364,7 +364,7 @@ def render(st: Settings, now: datetime, demo: bool = False) -> str:
     meta.append(f"Bankroll ${st.bankroll:,.0f}, quarter Kelly")
 
     return f"""<meta charset="utf-8">
-<title>Bet Card</title>
+<title>{"Sample Bet Card" if demo else "Bet Card"}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
