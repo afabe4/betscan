@@ -20,7 +20,7 @@ def _match(name: str, options: list[str]) -> str | None:
     return hit[0] if hit else None
 
 
-def enrich(games: list[Game], sport: Sport, ctx, now: datetime, log=print) -> None:
+def enrich(games: list[Game], sport: Sport, ctx, now: datetime, log=print, store=None) -> None:
     """ctx provides scoreboard/injuries/news/last_game/weather (live or demo)."""
     if not games:
         return
@@ -44,6 +44,12 @@ def enrich(games: list[Game], sport: Sport, ctx, now: datetime, log=print) -> No
             items = fn(sport)
         except Exception as e:  # noqa: BLE001
             log(f"  [espn] {what} unavailable: {e}"); items = []
+        if what == "injuries" and not getattr(ctx, "demo", False):
+            if store is not None:
+                store.track_injuries(sport.code, items, now)
+            else:   # no history -> can't tell new injuries from old ones
+                for i in items:
+                    i.reported = None
         for g in games:
             if what == "injuries":
                 g.injuries = [i for i in items if _match(i.team, [g.home, g.away])]
@@ -65,7 +71,7 @@ def enrich(games: list[Game], sport: Sport, ctx, now: datetime, log=print) -> No
                 setattr(g, attr, round((g.commence - last).total_seconds() / 86400, 1))
         if sport.outdoor_weather and g.indoor is False and g.city:
             try:
-                g.weather = ctx.weather(g.city, g.state, g.commence)
+                g.weather = ctx.weather(g.city, g.state, g.commence, g.home, g.neutral)
             except Exception as e:  # noqa: BLE001
                 log(f"  [weather] {g.label}: {e}")
 
@@ -98,7 +104,7 @@ def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ra
             rates=None) -> list[Candidate]:
     results = []
     for g in games:
-        cands = {(c.market, c.side): c for c in price_candidates(g)}
+        cands = {(c.market, c.side): c for c in price_candidates(g, settings.bet_books)}
         # NFL wind uses historical rates when available; the heuristic is the offline fallback.
         wind = wind_adjust(g, cands, rates, now, _moved_toward(store, g, "totals", "Under"))
         if wind:

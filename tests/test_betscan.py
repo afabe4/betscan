@@ -64,14 +64,14 @@ class Situational(unittest.TestCase):
     def test_news_attributed_to_headline_subject(self):
         g = Game("g", "nba", NOW, "New York Knicks", "Boston Celtics")
         g.news = [NewsItem("Knicks hit by illness before Celtics game", "", NOW - timedelta(hours=1))]
-        sigs = news_signals(g, Settings(), NOW)
+        sigs = news_signals(g, Settings(bet_books=None), NOW)
         self.assertTrue(sigs)
         self.assertTrue(all(s.side == "Boston Celtics" for s in sigs))
 
     def test_old_news_ignored(self):
         g = Game("g", "nba", NOW, "New York Knicks", "Boston Celtics")
         g.news = [NewsItem("Knicks guard suspended", "", NOW - timedelta(days=5))]
-        self.assertEqual(news_signals(g, Settings(), NOW), [])
+        self.assertEqual(news_signals(g, Settings(bet_books=None), NOW), [])
 
     def test_movement_discounts_priced_injury(self):
         """If the line already moved hard toward the injury, the signal shrinks."""
@@ -85,7 +85,7 @@ class Situational(unittest.TestCase):
             store = Store(Path(d) / "s.sqlite")
             store.record_lines([g_at(3.0)], NOW - timedelta(hours=6))   # Away +3
             store.record_lines([g_at(-3.5)], NOW)                      # Away -3.5 after news
-            cands = analyze([g_at(-3.5)], Settings(), NOW, store)
+            cands = analyze([g_at(-3.5)], Settings(bet_books=None), NOW, store)
         away = next(c for c in cands if c.side == "Away")
         inj = next(s for s in away.signals if s.kind == "injury")
         self.assertLess(inj.strength, 1.5)
@@ -123,7 +123,7 @@ class Demo(unittest.TestCase):
         cands = []
         for code, games in slate.items():
             enrich(games, SPORTS[code], ctx, NOW, log=lambda m: None)
-            cands += analyze(games, Settings(), NOW)
+            cands += analyze(games, Settings(bet_books=None), NOW)
         dedupe_correlated(cands)
         bets = {(c.game.id, c.selection) for c in cands if c.tier == "BET"}
         self.assertIn(("demo-nfl-1", "Under 42.5"), bets)        # wind game

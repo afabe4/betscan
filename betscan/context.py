@@ -32,8 +32,8 @@ class LiveContext:
     def last_game(self, sport, team_id, before):
         return self.espn.last_game(sport, team_id, before)
 
-    def weather(self, city, state, when):
-        return self.wx.at_kickoff(city, state, when)
+    def weather(self, city, state, when, home=None, neutral=False):
+        return self.wx.at_kickoff(city, state, when, home, neutral)
 
 
 # --- demo ------------------------------------------------------------------
@@ -113,6 +113,8 @@ def demo_games(now: datetime) -> dict[str, list[Game]]:
 
 
 class DemoContext:
+    demo = True
+
     def __init__(self, now: datetime, games: dict[str, list[Game]]):
         self.now = now
         self.games = games
@@ -183,7 +185,7 @@ class DemoContext:
             return before - timedelta(days=2)
         return before - timedelta(days=7)
 
-    def weather(self, city, state, when):
+    def weather(self, city, state, when, home=None, neutral=False):
         if city == "Cleveland":
             return {"temp_f": 34, "wind_mph": 22, "gust_mph": 35, "precip_in": 0.1, "precip_prob": 70}
         return None

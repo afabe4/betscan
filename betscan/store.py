@@ -23,7 +23,12 @@ CREATE TABLE IF NOT EXISTS picks (
   result TEXT, profit REAL,
   UNIQUE(game_id, market, side)
 );
+CREATE TABLE IF NOT EXISTS injuries (
+  sport TEXT, team TEXT, player TEXT, position TEXT, status TEXT, first_seen TEXT, last_seen TEXT,
+  PRIMARY KEY (sport, team, player)
+);
 """
+BASELINE = "1970-01-01T00:00:00+00:00"   # status already in place when tracking started
 # Lower = stronger. A pick that upgrades (WATCH -> BET) is re-recorded at the
 # price available when it upgraded; otherwise the first sighting is kept.
 TIER_RANK = {"BET": 0, "TEASER": 1, "VERIFY": 2, "ALT": 3, "LEAN": 4, "WATCH": 5, "MODEL": 6}
@@ -83,6 +88,35 @@ class Store:
                 (game_id, row[0])):
             out.setdefault(book, {}).setdefault(market, []).append((outcome, point, price))
         return out
+
+    # --- injuries --------------------------------------------------------------
+    def track_injuries(self, sport: str, injuries, now: datetime) -> None:
+        """Set each Injury.reported to when we first saw its *current* status.
+
+        ESPN's injury timestamps refresh daily, so they can't tell news from old
+        news. Instead: the first scan records a baseline (nothing counts as new);
+        afterwards a new entry or a status change (Questionable -> Out) is dated now.
+        """
+        have_baseline = self.db.execute("SELECT 1 FROM injuries WHERE sport=? LIMIT 1", (sport,)).fetchone()
+        ts = now.isoformat()
+        for inj in injuries:
+            key = (sport, inj.team, inj.player)
+            row = self.db.execute("SELECT status, first_seen FROM injuries WHERE sport=? AND team=? AND player=?",
+                                  key).fetchone()
+            if row is None:
+                first = ts if have_baseline else BASELINE
+                self.db.execute("INSERT INTO injuries VALUES (?,?,?,?,?,?,?)",
+                                (*key, inj.position, inj.status, first, ts))
+            elif row[0] != inj.status:
+                first = ts
+                self.db.execute("UPDATE injuries SET status=?, first_seen=?, last_seen=? "
+                                "WHERE sport=? AND team=? AND player=?", (inj.status, ts, ts, *key))
+            else:
+                first = row[1]
+                self.db.execute("UPDATE injuries SET last_seen=? WHERE sport=? AND team=? AND player=?",
+                                (ts, *key))
+            inj.reported = None if first == BASELINE else datetime.fromisoformat(first)
+        self.db.commit()
 
     # --- picks ---------------------------------------------------------------
     def _upsert(self, row: dict):

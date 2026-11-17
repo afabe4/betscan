@@ -103,19 +103,25 @@ class ESPN:
         self.f = fetcher
 
     def scoreboard(self, sport: Sport, start: datetime, end: datetime) -> list[dict]:
-        params = {"dates": f"{start:%Y%m%d}-{end:%Y%m%d}", "limit": 500}
-        if sport.code in COLLEGE_GROUPS:
-            params["groups"] = COLLEGE_GROUPS[sport.code]
-        return parse_scoreboard(self.f.get_json(f"{BASE}/{sport.espn_path}/scoreboard", params, ttl=1800))
+        """Games in [start, end]. ESPN rejects day ranges (YYYYMMDD-YYYYMMDD) but
+        accepts whole months (YYYYMM), so fetch each month and filter."""
+        months, cur = [], start.replace(day=1)
+        while cur <= end:
+            months.append(f"{cur:%Y%m}")
+            cur = (cur + timedelta(days=32)).replace(day=1)
+        out = []
+        for m in months:
+            params = {"dates": m, "limit": 1000}
+            if sport.code in COLLEGE_GROUPS:
+                params["groups"] = COLLEGE_GROUPS[sport.code]
+            data = self.f.get_json(f"{BASE}/{sport.espn_path}/scoreboard", params, ttl=1800)
+            out += [e for e in parse_scoreboard(data)
+                    if e["date"] and start - timedelta(hours=12) <= e["date"] <= end + timedelta(hours=12)]
+        return out
 
     def results(self, sport: Sport, start: datetime, end: datetime) -> list[dict]:
-        """Completed games in [start, end], fetched in 3-week chunks."""
-        out, cur = [], start
-        while cur < end:
-            nxt = min(end, cur + timedelta(days=21))
-            out += [e for e in self.scoreboard(sport, cur, nxt) if e["completed"]]
-            cur = nxt + timedelta(days=1)
-        return out
+        """Completed games in [start, end]."""
+        return [e for e in self.scoreboard(sport, start, end) if e["completed"]]
 
     def injuries(self, sport: Sport) -> list[Injury]:
         return parse_injuries(self.f.get_json(f"{BASE}/{sport.espn_path}/injuries", ttl=900))

@@ -28,6 +28,11 @@ SPORTS = {
 # present in a game's odds becomes the fair-price reference.
 SHARP_BOOKS = ["pinnacle", "circasports", "lowvig", "betonlineag", "bookmaker"]
 
+# Books you can bet at. Everything else (Pinnacle, EU books, exchanges) is only used
+# as the fair-price benchmark. Default: US state-regulated books on The Odds API.
+US_REGULATED = ("draftkings", "fanduel", "betmgm", "williamhill_us", "espnbet", "betrivers",
+                "fanatics", "hardrockbet", "ballybet", "betparx", "fliff", "windcreek")
+
 # Key positions per sport, with a rough importance weight 0-1.
 KEY_POSITIONS = {
     "nfl": {"QB": 1.0, "LT": 0.35, "WR": 0.3, "RB": 0.2, "TE": 0.2, "CB": 0.25,
@@ -53,6 +58,7 @@ class Settings:
     kelly_mult: float = 0.25        # quarter Kelly
     max_stake_pct: float = 0.03     # cap any single stake at 3% of bankroll
     wind_mph: float = 15.0          # football wind threshold
+    bet_books: tuple | None = US_REGULATED   # None = every book counts as bettable
     model_weight: float = 0.0       # efficiency model's share of the score (0 = context only)
     cache_dir: Path = field(default_factory=lambda: Path(
         os.environ.get("BETSCAN_HOME", Path.home() / ".betscan")))

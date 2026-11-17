@@ -48,7 +48,7 @@ def reference(game: Game, market: str) -> tuple[str, dict[str, tuple[float, floa
     return "consensus", out
 
 
-def price_candidates(game: Game) -> list[Candidate]:
+def price_candidates(game: Game, bet_books=None) -> list[Candidate]:
     cands = []
     markets = {m for b in game.books.values() for m in b}
     for market in sorted(markets):
@@ -59,7 +59,7 @@ def price_candidates(game: Game) -> list[Candidate]:
         for side, (ref_prob, ref_point) in fair.items():
             best = None
             for book, mk in game.books.items():
-                if book == ref_name:
+                if book == ref_name or (bet_books is not None and book not in bet_books):
                     continue
                 for o in mk.get(market, []):
                     if o.name != side:

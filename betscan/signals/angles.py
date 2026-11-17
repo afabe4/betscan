@@ -92,13 +92,15 @@ def _consensus_total(game: Game) -> float | None:
 
 
 def teaser_legs(games: list[Game], rates: HistoricalRates, include_favs: bool = False,
-                teaser_points: float = 6.0) -> list[TeaserLeg]:
+                teaser_points: float = 6.0, bet_books=None) -> list[TeaserLeg]:
     legs = []
     for g in games:
         if g.sport != "nfl":
             continue
         total = _consensus_total(g)
         for book, mk in g.books.items():
+            if bet_books is not None and book not in bet_books:
+                continue
             for o in mk.get("spreads", []):
                 if o.point is None:
                     continue

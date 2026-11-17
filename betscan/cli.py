@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import report
-from .config import SPORTS, Settings
+from .config import SPORTS, US_REGULATED, Settings
 from .context import DemoContext, LiveContext, demo_games
 from .engine import analyze, dedupe_correlated, enrich
 from .history import FALLBACK_RATES, get_rates
@@ -34,7 +34,7 @@ def main(argv=None) -> int:
     s = sub.add_parser("scan", help="scan upcoming games")
     s.add_argument("--sports", default="nfl", help=f"comma list from {','.join(SPORTS)}")
     s.add_argument("--demo", action="store_true", help="run on built-in fabricated data (offline)")
-    s.add_argument("--hours", type=int, default=96, help="look-ahead window")
+    s.add_argument("--hours", type=int, default=168, help="look-ahead window (a full NFL week)")
     s.add_argument("--min-ev", type=float, default=1.5, help="min EV %% for a BET")
     s.add_argument("--bankroll", type=float, default=1000.0)
     s.add_argument("--kelly", type=float, default=0.25, help="Kelly multiplier")
@@ -44,6 +44,8 @@ def main(argv=None) -> int:
                    help="also tease -7.5/-8.5 favorites (lost money 2018-25; off by default)")
     s.add_argument("--markets", default="spreads,totals",
                    help="Odds API markets; each costs 1 credit per region (add h2h for moneylines)")
+    s.add_argument("--books", default=",".join(US_REGULATED),
+                   help="comma list of books you can bet at ('all' = any). Others are benchmark only")
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
@@ -83,7 +85,8 @@ def load_rates(fetcher: Fetcher):
 
 def scan(a, p) -> int:
     st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
-                  model_weight=a.model_weight, markets=a.markets)
+                  model_weight=a.model_weight, markets=a.markets,
+                  bet_books=None if a.books == "all" else tuple(b.strip() for b in a.books.split(",")))
     now = datetime.now(timezone.utc)
     codes = [c.strip() for c in a.sports.split(",") if c.strip()]
     bad = [c for c in codes if c not in SPORTS]
@@ -93,6 +96,7 @@ def scan(a, p) -> int:
     store = None if (a.no_store or a.demo) else Store(st.db_path)
     fetcher = Fetcher(st.cache_dir)
     if a.demo:
+        st.bet_books = None   # demo uses made-up book names
         slate = demo_games(now)
         ctx = DemoContext(now, slate)
         codes = [c for c in codes if c in slate] or list(slate)
@@ -111,7 +115,7 @@ def scan(a, p) -> int:
             continue
         if store:
             store.record_lines(games, now)
-        enrich(games, sport, ctx, now, log=_log)
+        enrich(games, sport, ctx, now, log=_log, store=store)
         ratings = None if a.no_efficiency else ctx.ratings(sport, now, log=_log)
         all_cands += analyze(games, st, now, store, ratings, rates if code == "nfl" else None)
         if code == "nfl":
@@ -123,7 +127,8 @@ def scan(a, p) -> int:
     tiers = ("BET", "VERIFY", "ALT", "LEAN", "WATCH") if a.all else ("BET", "VERIFY", "ALT", "LEAN")
     print(report.terminal(all_cands, show=tiers))
 
-    legs = teaser_legs(nfl_games, rates, include_favs=a.teaser_favs) if rates and nfl_games else []
+    legs = (teaser_legs(nfl_games, rates, include_favs=a.teaser_favs, bet_books=st.bet_books)
+            if rates and nfl_games else [])
     teasers = best_teasers(legs, a.teaser_price, a.teaser3_price, st.bankroll, st.kelly_mult,
                            st.max_stake_pct)
     if nfl_games:

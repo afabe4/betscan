@@ -118,3 +118,36 @@ class StoreReview(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InjuryTracking(unittest.TestCase):
+    def test_only_status_changes_are_news(self):
+        from betscan.models import Injury
+        with tempfile.TemporaryDirectory() as d:
+            st = Store(Path(d) / "s.sqlite")
+            first = [Injury("Team A", "QB1", "QB", "Questionable", NOW), Injury("Team A", "WR1", "WR", "Out", NOW)]
+            st.track_injuries("nfl", first, NOW)
+            self.assertTrue(all(i.reported is None for i in first))           # baseline run
+            later = NOW + timedelta(hours=6)
+            second = [Injury("Team A", "QB1", "QB", "Out", NOW), Injury("Team A", "WR1", "WR", "Out", NOW),
+                      Injury("Team B", "QB2", "QB", "Doubtful", NOW)]
+            st.track_injuries("nfl", second, later)
+            self.assertEqual(second[0].reported, later)    # Questionable -> Out
+            self.assertIsNone(second[1].reported)          # unchanged since baseline
+            self.assertEqual(second[2].reported, later)    # newly listed
+
+
+class NWSParse(unittest.TestCase):
+    def test_grid(self):
+        from datetime import datetime, timezone
+        from betscan.sources.weather import parse_nws_grid
+        props = {"windSpeed": {"values": [{"validTime": "2026-11-22T17:00:00+00:00/PT2H", "value": 30},
+                                          {"validTime": "2026-11-22T19:00:00+00:00/PT2H", "value": 36}]},
+                 "windGust": {"values": [{"validTime": "2026-11-22T16:00:00+00:00/PT6H", "value": 50}]},
+                 "temperature": {"values": [{"validTime": "2026-11-22T18:00:00+00:00/PT1H", "value": 0}]},
+                 "quantitativePrecipitation": {"values": [{"validTime": "2026-11-22T15:00:00+00:00/PT6H",
+                                                           "value": 6.0}]}}
+        w = parse_nws_grid(props, datetime(2026, 11, 22, 18, tzinfo=timezone.utc))
+        self.assertAlmostEqual(w["wind_mph"], 34 * 0.621371, places=1)   # mean of 30,36,36 km/h
+        self.assertAlmostEqual(w["temp_f"], 32.0)
+        self.assertAlmostEqual(w["precip_in"], 1.0 / 25.4, places=3)
