@@ -128,8 +128,21 @@ class Demo(unittest.TestCase):
         bets = {(c.game.id, c.selection) for c in cands if c.tier == "BET"}
         self.assertIn(("demo-nfl-1", "Under 42.5"), bets)        # wind game
         self.assertIn(("demo-nba-2", "Phoenix Suns ML"), bets)   # pure price
-        self.assertTrue(any(c.tier == "ALT" for c in cands))     # correlated side marked
+        tiers = {(c.game.id, c.selection): c.tier for c in cands}
+        self.assertEqual(tiers[("demo-nfl-2", "Denver Broncos -3.5")], "VERIFY")   # stale 2-pt-off line
+        self.assertEqual(tiers[("demo-nfl-2", "Denver Broncos ML")], "BET")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OffMarket(unittest.TestCase):
+    def test_far_off_number_is_verify(self):
+        g = Game("om", "ncaab", NOW + timedelta(hours=5), "UCF Knights", "Miss St")
+        for b, pt, pr in (("lowvig", -1.0, -111), ("draftkings", -1.5, -108), ("betmgm", -1.5, -105),
+                          ("fanduel", 1.5, -122)):
+            g.books[b] = {"spreads": [Outcome("UCF Knights", pr, pt), Outcome("Miss St", -110, -pt)]}
+        cands = analyze([g], Settings(bet_books=("draftkings", "fanduel")), NOW)
+        ucf = next(c for c in cands if c.side == "UCF Knights")
+        self.assertEqual(ucf.tier, "VERIFY")

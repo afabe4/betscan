@@ -23,6 +23,58 @@ python -m betscan scan --sports nfl,nba --html report.html    # live
 | **model** | per-sport efficiency (below) | Projected score → win/cover/over probability, compared with the market's fair price. Context only by default (see backtest). |
 | **movement** | Local SQLite snapshots | If the line already moved toward a signal since we first saw the game, that signal is cut 70% and marked "priced". |
 
+## College basketball (NCAAB)
+
+```bash
+python -m betscan scan --sports ncaab --html report.html
+python -m betscan ncaab-backtest          # reproduce the numbers below
+```
+
+**The play: totals, early, mid-season onward.** Opponent-adjusted ratings are built from every D1
+result this season (ESPN), seeded with last season's ratings shrunk 50%, blowouts capped at 20 points,
+recent games weighted more (60-day half-life). When the model's total is 3+ points off the line
+**and both teams have played 10+ games**, the side the model likes is re-priced at its backtested win
+rate and becomes a BET at DraftKings/FanDuel if the price allows.
+
+Walk-forward backtest on the Sportsbook Review archive (57,113 games, 2007-08 to 2020-21, ratings
+only use games before each date; settings picked on 2008-14, then checked on 2015-21):
+
+| Totals, model 3+ pts off, both teams 10+ games | 2008-14 | 2015-21 |
+|---|---|---|
+| vs **opening** total | 55.0% (2,315) | 56.1% (4,454) |
+| ...0.5 pt worse than opener | 53.5% | 55.0% |
+| ...1.0 pt worse than opener | 52.4% | 53.8% |
+| vs **closing** total | 51.0% | 52.0% |
+| vs opener in **November** (no games filter) | 57.7% | **48.3%** |
+
+Every season 2008-09 to 2020-21 cleared 52.4% (worst 52.7%). Three things follow:
+
+- **Timing is the edge.** It's large at the opener and gone by the close: the market moves toward the
+  model's number by tip-off. Scan right after lines post and bet promptly; a pick flagged "the total has
+  already moved toward this side" is mostly priced.
+- **Nothing before ~mid-December.** Until teams have 10 games the model leans on last season, and in the
+  transfer-portal era that lost money (48.3% in November 2015-21). Those games show as context only.
+- **The data ends in 2021.** Markets may be sharper now. `review` measures your CLV live: if your bets
+  stop beating the closing total, the edge has closed and you should stop.
+
+Spreads: the same model was 53.5% / 55.8% vs the opener in Jan-Mar but swung wildly by season (one season
+at 65.9%), so it's not used for bets. Torvik's AdjO/AdjD/tempo are shown as context.
+
+College scans use US books only (2 credits: spreads + totals x 1 region); the totals model supplies the
+fair price, so Pinnacle isn't needed. Lines for the next day typically post in the evening; four scans a
+day is ~240 credits/month:
+
+```cron
+CRON_TZ=America/New_York
+0 7,11,16,21 * * *   cd ~/betscan && python3 -m betscan scan --sports ncaab >> ~/.betscan/ncaab.log 2>&1
+30 6 * * *           cd ~/betscan && python3 -m betscan review >> ~/.betscan/review.log 2>&1
+```
+
+With the NFL schedule too, that's ~395 of the 500 free credits.
+
+Price-only picks are BETs only against a sharp reference line. A book 2+ points off the reference spread
+(3+ on totals) is flagged VERIFY: that's usually a stale line or a feed error, not an edge.
+
 ## Efficiency models
 
 | Sport | Source | Metrics | Key needed |

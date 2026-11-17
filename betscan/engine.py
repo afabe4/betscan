@@ -101,10 +101,17 @@ def _attach(cands: dict, sig: Signal):
 
 
 def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ratings=None,
-            rates=None) -> list[Candidate]:
+            rates=None, ncaab=None) -> list[Candidate]:
+    """ncaab: (Ratings, NameIndex) for the backtested college totals model."""
+    from .ncaab.live import totals_signal
     results = []
     for g in games:
         cands = {(c.market, c.side): c for c in price_candidates(g, settings.bet_books)}
+        if ncaab and g.sport == "ncaab":
+            moved = max((_moved_toward(store, g, "totals", sd) or 0) for sd in ("Over", "Under"))
+            sig = totals_signal(g, cands, ncaab[0], ncaab[1], moved if store else None)
+            if sig:
+                _attach(cands, sig)
         # NFL wind uses historical rates when available; the heuristic is the offline fallback.
         wind = wind_adjust(g, cands, rates, now, _moved_toward(store, g, "totals", "Under"))
         if wind:
@@ -115,7 +122,7 @@ def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ra
                 + efficiency_signals(g, ratings, settings.model_weight))
         first_seen = store.first_seen(g.id) if store else None
         for sig in sigs:
-            if sig.kind in ("model", "wind"):
+            if sig.kind in ("model", "wind", "ncaab_model"):
                 _attach(cands, sig)
                 continue
             moved = _moved_toward(store, g, sig.market, sig.side)
@@ -134,13 +141,28 @@ def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ra
     return results
 
 
+def _trusted_price(c: Candidate) -> bool:
+    """A BET needs a fair price we trust: a sharp book's line, or a backtested model
+    that re-priced the candidate. A median of soft books alone is too weak."""
+    if getattr(c, "ref_book", None) != "consensus":
+        return True
+    return any(x.kind in ("ncaab_model", "wind") for x in c.signals)
+
+
 def score_candidate(c: Candidate, s: Settings) -> None:
     situational = sum(x.strength for x in c.signals) - sum(x.strength for x in c.against)
     ev_pts = max(-3.0, min(6.0, (c.ev or 0) * 100))
     c.score = round(ev_pts + situational, 2)
-    if c.ev is not None and c.ev > 0.12:
+    ref_pt = getattr(c, "ref_point", None)
+    off_market = (c.approx and ref_pt is not None and c.point is not None
+                  and abs(c.point - ref_pt) >= (2.0 if c.market == "spreads" else 3.0))
+    if (c.ev is not None and c.ev > 0.12) or (off_market and (c.ev or 0) > 0):
         c.tier = "VERIFY"  # almost always a stale/bad line or a mismatched market
-    elif c.ev is not None and c.ev >= s.min_ev and situational > -1.0:
+        if off_market:
+            c.signals.append(Signal("line", c.market, c.side, 0.0,
+                                    f"{c.best_book} hangs {c.point:+g} vs the reference {ref_pt:+g}: "
+                                    "a number this far off is usually stale or a feed error. Check it's live"))
+    elif c.ev is not None and c.ev >= s.min_ev and situational > -1.0 and _trusted_price(c):
         c.tier = "BET"
     elif situational >= s.min_lean_score and (c.ev or 0) >= -0.015:
         c.tier = "LEAN"

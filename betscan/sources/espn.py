@@ -106,9 +106,15 @@ class ESPN:
         """Games in [start, end]. ESPN rejects day ranges (YYYYMMDD-YYYYMMDD) but
         accepts whole months (YYYYMM), so fetch each month and filter."""
         months, cur = [], start.replace(day=1)
-        while cur <= end:
-            months.append(f"{cur:%Y%m}")
-            cur = (cur + timedelta(days=32)).replace(day=1)
+        if (end - start).days <= 10:   # month queries cap at 1000 games: use days
+            d = start
+            while d.date() <= end.date():
+                months.append(f"{d:%Y%m%d}")
+                d += timedelta(days=1)
+        else:
+            while cur <= end:
+                months.append(f"{cur:%Y%m}")
+                cur = (cur + timedelta(days=32)).replace(day=1)
         out = []
         for m in months:
             params = {"dates": m, "limit": 1000}

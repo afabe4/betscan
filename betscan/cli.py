@@ -24,6 +24,10 @@ from .sources.odds_api import fetch_games
 from .store import Store
 
 
+SPORT_REGIONS = {"nfl": "us,eu", "ncaab": "us"}
+SPORT_HOURS = {"nfl": 168, "ncaab": 36}
+
+
 def _log(m):
     print(m, file=sys.stderr)
 
@@ -34,7 +38,10 @@ def main(argv=None) -> int:
     s = sub.add_parser("scan", help="scan upcoming games")
     s.add_argument("--sports", default="nfl", help=f"comma list from {','.join(SPORTS)}")
     s.add_argument("--demo", action="store_true", help="run on built-in fabricated data (offline)")
-    s.add_argument("--hours", type=int, default=168, help="look-ahead window (a full NFL week)")
+    s.add_argument("--hours", type=int, default=None,
+                   help="look-ahead window (default: NFL 168h = a week, NCAAB 36h)")
+    s.add_argument("--regions", default=None,
+                   help="Odds API regions (default: NFL us,eu for Pinnacle; NCAAB us = 2 credits/scan)")
     s.add_argument("--min-ev", type=float, default=1.5, help="min EV %% for a BET")
     s.add_argument("--bankroll", type=float, default=1000.0)
     s.add_argument("--kelly", type=float, default=0.25, help="Kelly multiplier")
@@ -61,6 +68,7 @@ def main(argv=None) -> int:
     r.add_argument("--top", type=int, default=40)
     b = sub.add_parser("backtest", help="walk-forward NFL efficiency-model backtest vs closing lines")
     b.add_argument("--seasons", default="2023-2026")
+    sub.add_parser("ncaab-backtest", help="walk-forward college totals/spreads backtest, 2008-2021")
     a = p.parse_args(argv)
 
     st = Settings()
@@ -69,6 +77,9 @@ def main(argv=None) -> int:
     if a.cmd == "backtest":
         from .backtest import main as bt_main
         return bt_main(a.seasons)
+    if a.cmd == "ncaab-backtest":
+        from .ncaab.report import main as nb
+        return nb(Fetcher(st.cache_dir))
     if a.cmd == "angles":
         return show_angles(st)
     if a.cmd == "review":
@@ -85,7 +96,7 @@ def load_rates(fetcher: Fetcher):
 
 
 def scan(a, p) -> int:
-    st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
+    st = Settings(hours_ahead=a.hours or 168, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
                   model_weight=a.model_weight, markets=a.markets,
                   bet_books=(None if a.books == "all" else US_REGULATED if a.books == "us"
                              else tuple(b.strip() for b in a.books.split(","))))
@@ -111,7 +122,9 @@ def scan(a, p) -> int:
         sport = SPORTS[code]
         _log(f"Scanning {code.upper()}...")
         try:
-            games = slate[code] if a.demo else fetch_games(sport, st, fetcher)
+            games = slate[code] if a.demo else fetch_games(
+                sport, st, fetcher, regions=a.regions or SPORT_REGIONS.get(code),
+                hours=a.hours or SPORT_HOURS.get(code))
         except Exception as e:  # noqa: BLE001
             _log(f"  odds unavailable for {code}: {e}")
             continue
@@ -119,7 +132,15 @@ def scan(a, p) -> int:
             store.record_lines(games, now)
         enrich(games, sport, ctx, now, log=_log, store=store)
         ratings = None if a.no_efficiency else ctx.ratings(sport, now, log=_log)
-        all_cands += analyze(games, st, now, store, ratings, rates if code == "nfl" else None)
+        ncaab = None
+        if code == "ncaab" and not a.demo:
+            from .ncaab.live import NameIndex, build_ratings
+            try:
+                r = build_ratings(fetcher, now, log=_log)
+                ncaab = (r, NameIndex(r.o))
+            except Exception as e:  # noqa: BLE001
+                _log(f"  [ncaab] model unavailable: {e}")
+        all_cands += analyze(games, st, now, store, ratings, rates if code == "nfl" else None, ncaab)
         if code == "nfl":
             nfl_games += games
 

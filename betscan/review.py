@@ -70,6 +70,20 @@ def find_result(pick: dict, games: list[dict], abbr: dict) -> tuple[float, float
     return None
 
 
+def find_cbb_result(pick: dict, fetcher, now: datetime) -> tuple[float, float] | None:
+    """College results from ESPN, matched by names on the game's US date (or the day before)."""
+    from .ncaab.live import NameIndex, day_results
+    when = datetime.fromisoformat(pick["commence"]) - timedelta(hours=5)   # ~US Eastern date
+    for day in (when.date(), when.date() - timedelta(days=1)):
+        rows = day_results(fetcher, day, now.date())
+        idx = NameIndex([r[0] for r in rows] + [r[1] for r in rows])
+        h, a = idx.find(pick["home"]), idx.find(pick["away"])
+        for r in rows:
+            if (r[0], r[1]) == (h, a):
+                return r[2], r[3]
+    return None
+
+
 def grade(pick: dict, hs: float, as_: float) -> tuple[str, float | None]:
     m, side, pt = pick["market"], pick["side"], pick["point"]
     margin = hs - as_ if side == pick["home"] else as_ - hs
@@ -97,11 +111,14 @@ def run(store: Store, fetcher, now: datetime | None = None) -> list[dict]:
         if p["clv"] is None:
             snap = store.closing_snapshot(p["game_id"], p["commence"])
             upd.update(closing_value(p, snap))
-        if p["result"] is None and p["sport"] == "nfl" and \
+        if p["result"] is None and p["sport"] in ("nfl", "ncaab") and \
                 datetime.fromisoformat(p["commence"]) < now - timedelta(hours=4):
-            if games is None:
-                games = load_games(fetcher)
-            sc = find_result(p, games, abbr)
+            if p["sport"] == "nfl":
+                if games is None:
+                    games = load_games(fetcher)
+                sc = find_result(p, games, abbr)
+            else:
+                sc = find_cbb_result(p, fetcher, now)
             if sc:
                 upd["result"], upd["profit"] = grade(p, *sc)
         if upd:
