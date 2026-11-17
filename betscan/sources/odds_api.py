@@ -32,18 +32,19 @@ def parse_odds(payload: list[dict], sport: Sport) -> list[Game]:
 
 def fetch_games(sport: Sport, settings: Settings, fetcher: Fetcher, regions: str | None = None,
                 hours: int | None = None) -> list[Game]:
-    if not settings.odds_api_key:
-        raise RuntimeError("ODDS_API_KEY is not set (free key: https://the-odds-api.com)")
+    # The key goes in the x-api-key header, never the URL. In the cloud the network proxy
+    # injects the saved key and overwrites this header; locally, set ODDS_API_KEY.
+    key = settings.odds_api_key or "proxy-injected"
     now = datetime.now(timezone.utc)
     params = {
-        "apiKey": settings.odds_api_key,
         "regions": regions or settings.regions,
         "markets": settings.markets,
         "oddsFormat": "american",
         "commenceTimeFrom": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "commenceTimeTo": (now + timedelta(hours=hours or settings.hours_ahead)).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    payload = fetcher.get_json(f"{BASE}/sports/{sport.odds_key}/odds", params, ttl=300)
+    payload = fetcher.get_json(f"{BASE}/sports/{sport.odds_key}/odds", params, ttl=300,
+                               headers={"x-api-key": key})
     remaining = fetcher.last_headers.get("x-requests-remaining")
     if remaining is not None:
         print(f"  [odds-api] {sport.code}: {len(payload)} games, {remaining} credits left")

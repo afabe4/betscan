@@ -33,6 +33,10 @@ def _log(m):
 
 
 def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["run"]:
+        from .scheduled import run
+        return run(argv[1:])
     p = argparse.ArgumentParser(prog="betscan", description="Scan NFL betting lines for mispriced games.")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("scan", help="scan upcoming games")
@@ -63,6 +67,7 @@ def main(argv=None) -> int:
     s.add_argument("--no-efficiency", action="store_true", help="skip efficiency models")
     s.add_argument("--no-store", action="store_true", help="don't record snapshots")
     sub.add_parser("review", help="grade past picks vs closing line and results")
+    sub.add_parser("run", help="scheduled run: scan, grade, rebuild card, print ALERT/QUIET (see scheduled.py)")
     cd = sub.add_parser("card", help="build the bet card from the latest scans and your record")
     cd.add_argument("--out", type=Path, default=Path("card.html"))
     cd.add_argument("--demo", action="store_true", help="sample card with made-up bets and record")
