@@ -7,12 +7,18 @@ from .http import Fetcher
 from .models import Game, Injury, NewsItem, Outcome
 from .sources.espn import ESPN
 from .sources.weather import Weather
+from .efficiency.model import RatingSet, TeamRating
+from .efficiency.providers import get_ratings
 
 
 class LiveContext:
     def __init__(self, fetcher: Fetcher):
+        self.fetcher = fetcher
         self.espn = ESPN(fetcher)
         self.wx = Weather(fetcher)
+
+    def ratings(self, sport, now, log=print):
+        return get_ratings(sport, self.fetcher, self.espn, now, log)
 
     def scoreboard(self, sport, start, end):
         return self.espn.scoreboard(sport, start, end)
@@ -95,6 +101,22 @@ class DemoContext:
     def __init__(self, now: datetime, games: dict[str, list[Game]]):
         self.now = now
         self.games = games
+
+    def ratings(self, sport, now, log=print):
+        """Fabricated efficiency ratings for the demo teams."""
+        if sport.code == "nfl":
+            r = {"Buffalo Bills": (0.11, -0.04), "Cleveland Browns": (-0.06, -0.02),
+                 "Denver Broncos": (0.02, -0.09), "Las Vegas Raiders": (-0.08, 0.05)}
+            teams = {n: TeamRating(n, o, d, 62, 10, extra={"off_epa": o, "def_epa": d, "off_sr": 0.45})
+                     for n, (o, d) in r.items()}
+            return RatingSet("nfl", "DEMO EPA/play", "per_play", teams, 0.0, 62, 22.0, unit="EPA/play")
+        if sport.code == "nba":
+            r = {"Boston Celtics": (119.5, 110.0, 97), "New York Knicks": (117.0, 113.5, 98),
+                 "Phoenix Suns": (116.0, 113.0, 99), "Denver Nuggets": (118.5, 114.5, 100)}
+            teams = {n: TeamRating(n, o, d, p, 14, extra={"ortg": o, "drtg": d, "pace": p, "net": o - d})
+                     for n, (o, d, p) in r.items()}
+            return RatingSet("nba", "DEMO ORtg/DRtg", "per_poss", teams, 115.0, 99.0, unit="pts/100")
+        return None
 
     def scoreboard(self, sport, start, end):
         venues = {

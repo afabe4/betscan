@@ -38,7 +38,12 @@ def parse_scoreboard(data: dict) -> list[dict]:
         teams = {}
         for c in comp.get("competitors", []):
             t = c.get("team") or {}
-            teams[c.get("homeAway")] = {"id": str(t.get("id")), "name": t.get("displayName", "")}
+            try:
+                score = float(c.get("score")) if c.get("score") not in (None, "") else None
+            except (TypeError, ValueError):
+                score = None
+            teams[c.get("homeAway")] = {"id": str(t.get("id")), "name": t.get("displayName", ""),
+                                        "score": score}
         if "home" not in teams or "away" not in teams:
             continue
         out.append({
@@ -47,6 +52,8 @@ def parse_scoreboard(data: dict) -> list[dict]:
             "venue": venue.get("fullName"), "city": addr.get("city"),
             "state": addr.get("state") or addr.get("country"),
             "indoor": venue.get("indoor"),
+            "neutral": bool(comp.get("neutralSite")),
+            "completed": bool(((comp.get("status") or {}).get("type") or {}).get("completed")),
         })
     return out
 
@@ -100,6 +107,15 @@ class ESPN:
         if sport.code in COLLEGE_GROUPS:
             params["groups"] = COLLEGE_GROUPS[sport.code]
         return parse_scoreboard(self.f.get_json(f"{BASE}/{sport.espn_path}/scoreboard", params, ttl=1800))
+
+    def results(self, sport: Sport, start: datetime, end: datetime) -> list[dict]:
+        """Completed games in [start, end], fetched in 3-week chunks."""
+        out, cur = [], start
+        while cur < end:
+            nxt = min(end, cur + timedelta(days=21))
+            out += [e for e in self.scoreboard(sport, cur, nxt) if e["completed"]]
+            cur = nxt + timedelta(days=1)
+        return out
 
     def injuries(self, sport: Sport) -> list[Injury]:
         return parse_injuries(self.f.get_json(f"{BASE}/{sport.espn_path}/injuries", ttl=900))

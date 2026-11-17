@@ -8,6 +8,7 @@ from .config import Settings, Sport
 from .models import Candidate, Game, Signal
 from .odds_math import kelly_fraction
 from .signals.price import _bettor_point, price_candidates
+from .signals.efficiency import efficiency_signals
 from .signals.situational import injury_signals, news_signals, rest_signals, weather_signals
 
 
@@ -33,6 +34,7 @@ def enrich(games: list[Game], sport: Sport, ctx, now: datetime, log=print) -> No
             if (_match(g.home, [ev["home"]["name"]]) and _match(g.away, [ev["away"]["name"]])
                     and ev["date"] and abs((ev["date"] - g.commence).total_seconds()) < 12 * 3600):
                 g.venue, g.city, g.state, g.indoor = ev["venue"], ev["city"], ev["state"], ev["indoor"]
+                g.neutral = ev.get("neutral", False)
                 g.espn_ids = {g.home: ev["home"]["id"], g.away: ev["away"]["id"]}
                 break
 
@@ -91,14 +93,18 @@ def _attach(cands: dict, sig: Signal):
             other.against.append(sig)
 
 
-def analyze(games: list[Game], settings: Settings, now: datetime, store=None) -> list[Candidate]:
+def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ratings=None) -> list[Candidate]:
     results = []
     for g in games:
         cands = {(c.market, c.side): c for c in price_candidates(g)}
         sigs = (injury_signals(g, settings, now) + weather_signals(g, settings)
-                + rest_signals(g) + news_signals(g, settings, now))
+                + rest_signals(g) + news_signals(g, settings, now)
+                + efficiency_signals(g, ratings, settings.model_weight))
         first_seen = store.first_seen(g.id) if store else None
         for sig in sigs:
+            if sig.kind == "model":
+                _attach(cands, sig)
+                continue
             moved = _moved_toward(store, g, sig.market, sig.side)
             if moved is not None and moved >= max(1.0, sig.strength * 0.5):
                 sig.strength = round(sig.strength * 0.3, 2)

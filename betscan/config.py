@@ -53,6 +53,7 @@ class Settings:
     kelly_mult: float = 0.25        # quarter Kelly
     max_stake_pct: float = 0.03     # cap any single stake at 3% of bankroll
     wind_mph: float = 15.0          # football wind threshold
+    model_weight: float = 0.0       # efficiency model's share of the score (0 = context only)
     cache_dir: Path = field(default_factory=lambda: Path(
         os.environ.get("BETSCAN_HOME", Path.home() / ".betscan")))
 

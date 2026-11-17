@@ -37,8 +37,11 @@ def terminal(cands: list[Candidate], show=("BET", "VERIFY", "ALT", "LEAN", "WATC
                      f" fair {fair:<6} EV {ev}{' (approx)' if c.approx else ''}  score {c.score:+.1f}"
                      + (f"  stake ${c.stake:.2f}" if c.stake else ""))
         for s in c.signals:
-            lines.append(f"           + {s.kind:<8} {s.strength:>4.1f}  {s.detail}")
+            mark = "+" if s.strength else "i"
+            lines.append(f"           {mark} {s.kind:<8} {s.strength:>4.1f}  {s.detail}")
         for s in c.against:
+            if s.kind == "model" and not s.strength:
+                continue  # context-only model view is already shown on the side it favors
             lines.append(f"           - {s.kind:<8} {s.strength:>4.1f}  {s.detail}")
     return "\n".join(lines)
 
@@ -65,7 +68,8 @@ def to_html(cands: list[Candidate], generated: datetime, demo: bool) -> str:
         if c.tier == "PASS":
             continue
         sig = "".join(f'<li class="pro"><b>{e(s.kind)}</b> +{s.strength:.1f} {e(s.detail)}</li>' for s in c.signals)
-        sig += "".join(f'<li class="con"><b>{e(s.kind)}</b> −{s.strength:.1f} {e(s.detail)}</li>' for s in c.against)
+        sig += "".join(f'<li class="con"><b>{e(s.kind)}</b> −{s.strength:.1f} {e(s.detail)}</li>' for s in c.against
+                       if not (s.kind == "model" and not s.strength))
         ev = f"{c.ev * 100:+.1f}%" if c.ev is not None else "n/a"
         cards.append(f"""
 <article class="card t-{c.tier.lower()}">

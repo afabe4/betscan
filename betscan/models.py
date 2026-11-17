@@ -43,6 +43,7 @@ class Game:
     city: str | None = None
     state: str | None = None
     indoor: bool | None = None
+    neutral: bool = False
     home_rest_days: float | None = None
     away_rest_days: float | None = None
     injuries: list[Injury] = field(default_factory=list)

@@ -28,10 +28,24 @@ def main(argv=None) -> int:
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
+    s.add_argument("--model-weight", type=float, default=0.0,
+                   help="how much the efficiency model counts toward scores (default 0 = context only)")
+    s.add_argument("--no-efficiency", action="store_true", help="skip efficiency models")
     s.add_argument("--no-store", action="store_true", help="don't record snapshots")
+    r = sub.add_parser("ratings", help="print a sport's efficiency ratings")
+    r.add_argument("sport", choices=list(SPORTS))
+    r.add_argument("--top", type=int, default=40)
+    b = sub.add_parser("backtest", help="walk-forward NFL efficiency-model backtest vs closing lines")
+    b.add_argument("--seasons", default="2023-2026")
     a = p.parse_args(argv)
+    if a.cmd == "ratings":
+        return show_ratings(a)
+    if a.cmd == "backtest":
+        from .backtest import main as bt_main
+        return bt_main(a.seasons)
 
-    st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly)
+    st = Settings(hours_ahead=a.hours, min_ev=a.min_ev / 100, bankroll=a.bankroll, kelly_mult=a.kelly,
+                  model_weight=a.model_weight)
     now = datetime.now(timezone.utc)
     codes = [c.strip() for c in a.sports.split(",") if c.strip()]
     bad = [c for c in codes if c not in SPORTS]
@@ -59,7 +73,8 @@ def main(argv=None) -> int:
         if store:
             store.record_lines(games, now)
         enrich(games, sport, ctx, now, log=lambda m: print(m, file=sys.stderr))
-        all_cands += analyze(games, st, now, store)
+        ratings = None if a.no_efficiency else ctx.ratings(sport, now, log=lambda m: print(m, file=sys.stderr))
+        all_cands += analyze(games, st, now, store, ratings)
 
     dedupe_correlated(all_cands)
     order = {"BET": 0, "VERIFY": 1, "ALT": 2, "LEAN": 3, "WATCH": 4}
@@ -73,4 +88,19 @@ def main(argv=None) -> int:
     if a.html:
         a.html.write_text(report.to_html(all_cands, now, a.demo))
         print(f"\nHTML report: {a.html}", file=sys.stderr)
+    return 0
+
+
+def show_ratings(a) -> int:
+    st = Settings()
+    rs = LiveContext(Fetcher(st.cache_dir)).ratings(SPORTS[a.sport], datetime.now(timezone.utc),
+                                                     log=lambda m: print(m, file=sys.stderr))
+    if rs is None:
+        return 1
+    print(f"{rs.source}  (offense higher = better, defense lower = better; units {rs.unit})")
+    rows = sorted(rs.teams.values(), key=lambda t: t.def_rank + t.off_rank)
+    for t in rows[: a.top]:
+        pace = f"  pace {t.pace:.1f}" if t.pace else ""
+        print(f"{t.name:<30} off {t.off:8.3f} (#{t.off_rank:<3}) def {t.defn:8.3f} (#{t.def_rank:<3})"
+              f" g{t.games}{pace}")
     return 0

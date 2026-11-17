@@ -18,18 +18,23 @@ class Fetcher:
         self.ttl = ttl
         self.last_headers: dict[str, str] = {}
 
-    def get_json(self, url: str, params: dict | None = None, ttl: int | None = None):
+    def get_bytes(self, url: str, params: dict | None = None, ttl: int | None = None,
+                  headers: dict | None = None, timeout: int = 30) -> bytes:
         if params:
             url = f"{url}?{urllib.parse.urlencode(params)}"
         ttl = self.ttl if ttl is None else ttl
-        # Never write API keys into cache filenames.
+        # Hashed filenames: API keys in query strings never land on disk in clear.
         key = hashlib.sha256(url.encode()).hexdigest()[:24]
-        path = self.cache_dir / f"{key}.json"
+        path = self.cache_dir / f"{key}.bin"
         if ttl > 0 and path.exists() and time.time() - path.stat().st_mtime < ttl:
-            return json.loads(path.read_text())
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=20) as resp:
+            return path.read_bytes()
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             self.last_headers = {k.lower(): v for k, v in resp.headers.items()}
-            data = json.loads(resp.read().decode())
-        path.write_text(json.dumps(data))
-        return data
+            body = resp.read()
+        path.write_bytes(body)
+        return body
+
+    def get_json(self, url: str, params: dict | None = None, ttl: int | None = None,
+                 headers: dict | None = None):
+        return json.loads(self.get_bytes(url, params, ttl, headers).decode())
