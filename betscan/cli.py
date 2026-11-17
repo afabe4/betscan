@@ -19,7 +19,7 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="betscan", description="Scan betting lines for mispriced games.")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("scan", help="scan upcoming games")
-    s.add_argument("--sports", default="nfl,ncaaf,nba,nhl", help=f"comma list from {','.join(SPORTS)}")
+    s.add_argument("--sports", default="nfl", help=f"comma list from {','.join(SPORTS)}")
     s.add_argument("--demo", action="store_true", help="run on built-in fabricated data (offline)")
     s.add_argument("--hours", type=int, default=96, help="look-ahead window")
     s.add_argument("--min-ev", type=float, default=1.5, help="min EV %% for a BET")
