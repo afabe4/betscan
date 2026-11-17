@@ -3,3 +3,5 @@ __pycache__/
 *.json
 card.html
 data/http/
+!data/latest_*.json
+!data/card.html

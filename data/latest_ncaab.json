@@ -1,0 +1,33 @@
+{
+ "sport": "ncaab",
+ "scanned_at": "2026-11-17T22:50:48.391606+00:00",
+ "credits_left": null,
+ "bets": [
+  {
+   "sport": "ncaab",
+   "tier": "BET",
+   "kind": "price",
+   "game": "Boston College Eagles @ Harvard Crimson",
+   "home": "Harvard Crimson",
+   "away": "Boston College Eagles",
+   "commence": "2026-11-19T01:00:00+00:00",
+   "market": "spreads",
+   "selection": "Boston College Eagles -3.5",
+   "side": "Boston College Eagles",
+   "point": -3.5,
+   "book": "fanduel",
+   "price": -106.0,
+   "fair_prob": 0.5264621062766494,
+   "ev": 0.0231244706885827,
+   "stake": 6.13,
+   "limit_price": -108,
+   "limit_point": null,
+   "reasons": [
+    "Fanduel beats lowvig's no-vig line (fair 52.6%)."
+   ],
+   "grade": null
+  }
+ ],
+ "teasers": [],
+ "watch": []
+}

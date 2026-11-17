@@ -1,0 +1,180 @@
+<meta charset="utf-8">
+<title>Bet Card</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one column of betting slips, stub on the right edge like a printed ticket; record below. */
+:root {
+  --bg: #eef1f3; --card: #ffffff; --ink: #14191d; --muted: #5d6870; --line: #d5dbdf;
+  --accent: #d9531e; --accent-ink: #ffffff; --win: #1d7a4f; --loss: #b8342c; --push: #7a848b;
+  --nfl: #24508f; --ncaab: #d9531e; --stub: #f6f3ef;
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1418; --card: #182027; --ink: #e8edf0; --muted: #96a3ab; --line: #2a353d;
+  --accent: #f0743d; --accent-ink: #14191d; --win: #4cc489; --loss: #f07a70; --push: #8d989f;
+  --nfl: #7fa8e8; --ncaab: #f0743d; --stub: #1f2830; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1418; --card: #182027; --ink: #e8edf0; --muted: #96a3ab; --line: #2a353d;
+  --accent: #f0743d; --accent-ink: #14191d; --win: #4cc489; --loss: #f07a70; --push: #8d989f;
+  --nfl: #7fa8e8; --ncaab: #f0743d; --stub: #1f2830; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 36px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px;
+  border-bottom: 3px solid var(--ink); padding-bottom: 14px; }
+h1 { font: 700 clamp(40px, 7vw, 60px)/0.9 var(--f-display); margin: 0; letter-spacing: 0.01em; text-transform: uppercase; }
+.date { font: 600 20px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 6px 0 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
+.sample { margin: 0; padding: 10px 14px; border: 1px dashed var(--accent); border-radius: 8px; color: var(--accent); font-weight: 500; }
+h2 { font: 700 28px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; margin: 0;
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; text-wrap: balance; }
+h2 small { font: 500 14px var(--f-body); text-transform: none; letter-spacing: 0; color: var(--muted); }
+h3 { font: 700 18px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 10px; }
+section { display: grid; gap: 14px; min-width: 0; }
+section > *, .wrap > * { min-width: 0; }
+.slips { display: grid; gap: 14px; }
+.slip { display: grid; grid-template-columns: 1fr 156px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; overflow: hidden; }
+.slip-main { padding: 16px 18px; display: grid; gap: 6px; min-width: 0; }
+.slip-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; color: var(--muted); }
+.chip { font: 600 11px/1 var(--f-body); text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 7px; border-radius: 4px;
+  color: var(--accent-ink); background: var(--ncaab); }
+.chip-nfl { background: var(--nfl); }
+.kind { font-weight: 600; color: var(--ink); }
+.grade { font: 700 12px/1 var(--f-num); padding: 4px 7px; border-radius: 4px; border: 1.5px solid currentColor; }
+.grade-a { color: var(--win); } .grade-b { color: var(--muted); }
+.slip-meta time { margin-left: auto; font-variant-numeric: tabular-nums; }
+.game { margin: 2px 0 0; color: var(--muted); }
+.pick { margin: 0; font: 700 30px/1.05 var(--f-display); letter-spacing: 0.01em; text-wrap: balance; }
+.why { margin: 2px 0 0; padding-left: 18px; color: var(--ink); font-size: 14px; }
+.why li + li { margin-top: 2px; }
+.limit { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+.limit b { color: var(--ink); font-family: var(--f-num); font-weight: 600; }
+.slip-stub { position: relative; background: var(--stub); border-left: 2px dashed var(--line);
+  padding: 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.slip-stub::before, .slip-stub::after { content: ""; position: absolute; left: -9px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--line); }
+.slip-stub::before { top: -9px; } .slip-stub::after { bottom: -9px; }
+.stub-price { font: 600 34px/1 var(--f-num); color: var(--accent); font-variant-numeric: tabular-nums; }
+.stub-book { font-size: 13px; font-weight: 600; }
+.stub-nums { display: flex; gap: 14px; margin: 8px 0 0; }
+.stub-nums div { display: grid; }
+.stub-nums dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.stub-nums dd { margin: 0; font: 600 15px var(--f-num); font-variant-numeric: tabular-nums; }
+.legs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.legs span { font: 700 24px/1.05 var(--f-display); display: block; }
+.legs b { font-family: var(--f-num); font-size: 20px; }
+.legs small { color: var(--muted); font-size: 13px; }
+.empty { background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 22px; color: var(--muted); }
+.empty p { margin: 0; max-width: 62ch; }
+.empty-title { font: 700 22px/1.1 var(--f-display); text-transform: uppercase; color: var(--ink); margin-bottom: 6px !important; }
+code { font-family: var(--f-num); font-size: 0.9em; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; }
+.tile { padding: 14px 16px; display: grid; gap: 2px; border-left: 1px solid var(--line); min-width: 0; }
+.tile:first-child { border-left: 0; }
+.t-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.t-val { font: 600 28px/1.1 var(--f-num); font-variant-numeric: tabular-nums; }
+.t-sub { font-size: 13px; color: var(--muted); }
+.pos { color: var(--win); } .neg { color: var(--loss); }
+.chart { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 8px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .axis { fill: var(--muted); font: 11px var(--f-num); }
+.chart .run { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
+.chart .run.up, .chart .dot.up { stroke: var(--win); fill: var(--win); } .chart .run.up { fill: none; }
+.chart .run.down, .chart .dot.down { stroke: var(--loss); fill: var(--loss); } .chart .run.down { fill: none; }
+.chart .area.up { fill: var(--win); opacity: 0.12; } .chart .area.down { fill: var(--loss); opacity: 0.12; }
+.chart .end { font: 600 13px var(--f-num); } .chart .end.up { fill: var(--win); } .chart .end.down { fill: var(--loss); }
+.chart figcaption { font-size: 12px; color: var(--muted); padding: 2px 4px 0; }
+.two { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px; }
+.tblwrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; min-width: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+tbody th { font-weight: 600; }
+td:not(.rc-pick), thead th { white-space: nowrap; }
+.ref td { white-space: normal; } .ref td.num { white-space: nowrap; }
+.chart-scroll { overflow-x: auto; }
+.rc-pick small { display: block; color: var(--muted); font-size: 12px; }
+.res { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; font: 600 12px var(--f-num); color: var(--card); }
+.res-W { background: var(--win); } .res-L { background: var(--loss); } .res-P { background: var(--push); }
+.watch { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.watch li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.watch li:first-child { border-top: 0; }
+.watch p { margin: 0; }
+.w-tier { font: 600 11px/1 var(--f-body); letter-spacing: 0.08em; padding: 5px 0; border-radius: 4px; text-align: center;
+  border: 1px solid var(--line); color: var(--muted); align-self: start; }
+.w-verify { color: var(--loss); border-color: var(--loss); }
+.w-sel { font-weight: 600; } .w-sel span { font-weight: 400; color: var(--muted); font-family: var(--f-num); font-size: 13px; }
+.w-game, .w-note { font-size: 13px; color: var(--muted); }
+.w-none { display: block !important; color: var(--muted); }
+.ref td.num { font-family: var(--f-num); white-space: nowrap; }
+.foot { font-size: 13px; color: var(--muted); margin: 0; max-width: 70ch; }
+@media (max-width: 640px) {
+  .slip { grid-template-columns: 1fr; }
+  .slip-stub { border-left: 0; border-top: 2px dashed var(--line); flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+  .slip-stub::before, .slip-stub::after { display: none; }
+  .stub-nums { margin: 0; }
+  .slip-meta time { margin-left: 0; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile:nth-child(3) { border-left: 0; } .tile:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .two { grid-template-columns: 1fr; }
+  .pick { font-size: 26px; }
+  .chart svg { min-width: 520px; }
+}
+</style>
+<div class="wrap">
+  <header>
+    <div><h1>Bet Card</h1><p class="date">Tuesday, November 17</p></div>
+    <ul class="meta"><li>Last scan Tue 5:50 PM ET</li><li>Bankroll $1,000, quarter Kelly</li></ul>
+  </header>
+  
+  <section aria-labelledby="h-bets">
+    <h2 id="h-bets">Today's bets <small>1 on the card · $6 total stake</small></h2>
+    <div class="slips">
+<article class="slip" aria-label="Boston College Eagles -3.5">
+  <div class="slip-main">
+    <div class="slip-meta"><span class="chip chip-ncaab">College hoops</span><span class="kind">Price edge</span>
+      <time>Wed 8:00 PM ET</time></div>
+    <p class="game">Boston College Eagles @ Harvard Crimson</p>
+    <p class="pick">Boston College Eagles -3.5</p>
+    <ul class="why"><li>Fanduel beats lowvig&#x27;s no-vig line (fair 52.6%).</li></ul>
+    <p class="limit">no worse than <b>−108</b>.</p>
+  </div>
+  <div class="slip-stub">
+    <span class="stub-price">−106</span>
+    <span class="stub-book">FanDuel</span>
+    <dl class="stub-nums"><div><dt>Edge</dt><dd>+2.3%</dd></div>
+      <div><dt>Stake</dt><dd>$6</dd></div></dl>
+  </div>
+</article></div>
+  </section>
+  <section aria-labelledby="h-rec">
+    <h2 id="h-rec">Your record <small>bets this card recommended, at the logged price</small></h2>
+    
+<div class="empty"><p class="empty-title">No graded bets yet</p>
+<p>Every bet on this card is logged at the price shown. After a game ends, the next scan (or <code>python -m betscan card</code>)
+grades it against the final score and the closing line, and your record builds here.</p></div>
+  </section>
+  <section aria-labelledby="h-watch">
+    <h2 id="h-watch">Watch list <small>close, but not bets</small></h2>
+    <ul class="watch"><li class='w-none'>Nothing to watch.</li></ul>
+  </section>
+  <section aria-labelledby="h-ref">
+    <h2 id="h-ref">What to expect <small>how each play did in testing</small></h2>
+    <div class="tblwrap"><table class="ref"><thead><tr><th>Play</th><th>Rule</th><th>Hit rate</th><th>Sample</th><th>Break-even</th></tr></thead>
+    <tbody><tr><th scope='row'>Totals model, A</th><td>College basketball, model 6+ pts off the opener, both teams 10+ games</td><td class='num'>59.4% / 60.5%</td><td>2008-14 / 2015-21, 1,111 bets; ~59% half a point late</td><td class='num'>52.4%</td></tr><tr><th scope='row'>Totals model, B</th><td>Same, 3-6 pts off; only near the opener</td><td class='num'>54.3% / 55.1%</td><td>2008-14 / 2015-21, 5,658 bets; ~53% half a point late</td><td class='num'>52.4%</td></tr><tr><th scope='row'>Teaser legs</th><td>NFL 6-pt, dogs +1.5 to +2.5, total 48.5 or lower</td><td class='num'>78.3%</td><td>2006-25, 563 legs</td><td class='num'>73.9% at -120</td></tr><tr><th scope='row'>Wind under</th><td>NFL outdoor, 15+ mph at kickoff</td><td class='num'>56.4%</td><td>2006-25 vs closing totals, 459 games</td><td class='num'>52.4%</td></tr><tr><th scope='row'>Price edge</th><td>Book price better than Pinnacle&#x27;s no-vig line</td><td class='num'>n/a</td><td>Wins long run if the sharp line is right</td><td class='num'>beat the close</td></tr></tbody></table></div>
+    <p class="foot">Beating the closing line is the early sign the edge is real; win-loss takes hundreds of bets to mean much.
+    If your bets stop beating the close for a month, stop betting that play.</p>
+  </section>
+</div>
