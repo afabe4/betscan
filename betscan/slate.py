@@ -64,6 +64,8 @@ def reasons(c: Candidate) -> list[str]:
         gap = abs((mt or 0) - (c.point or 0))
         out.append(f"Model total {mt:.1f}, {gap:.1f} pts {'above' if c.side == 'Over' else 'below'} the line.")
         out.append(f"Backtested win rate at this gap: {c.fair_prob:.1%}.")
+        if gap < 6:
+            out.append("B play: only bet near the opener. If the total has moved half a point your way, pass.")
     elif kind == "wind":
         sig = next(s for s in c.signals if s.kind == "wind")
         out.append(sig.detail.split(". ")[0].replace("forecast", "Forecast") + ".")
@@ -81,15 +83,23 @@ def reasons(c: Candidate) -> list[str]:
     return out
 
 
+def _grade(c: Candidate) -> str | None:
+    for s in c.signals:
+        if s.kind == "ncaab_model" and "-> grade " in s.detail:
+            return s.detail.split("-> grade ")[1][0]
+    return None
+
+
 def bet_entry(c: Candidate, min_ev: float, min_edge: float = 3.0) -> dict:
     mt = _model_total(c)
+    grade = _grade(c)
     return {
         "sport": c.game.sport, "tier": c.tier, "kind": play_kind(c), "game": c.game.label,
         "home": c.game.home, "away": c.game.away, "commence": c.game.commence.isoformat(),
         "market": c.market, "selection": c.selection, "side": c.side, "point": c.point,
         "book": c.best_book, "price": c.best_price, "fair_prob": c.fair_prob, "ev": c.ev,
         "stake": c.stake, "limit_price": _limit_price(c.fair_prob, min_ev),
-        "limit_point": _limit_point(c, mt, min_edge), "reasons": reasons(c),
+        "limit_point": _limit_point(c, mt, min_edge), "reasons": reasons(c), "grade": grade,
     }
 
 

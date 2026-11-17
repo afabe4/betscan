@@ -20,8 +20,10 @@ SPORT_LABEL = {"ncaab": "College hoops", "nfl": "NFL"}
 KIND_LABEL = {"ncaab_model": "Totals model", "wind": "Wind under", "price": "Price edge", "teaser": "Teaser legs"}
 # What each play did in testing; shown so the record has something to be judged against.
 REFERENCE = [
-    ("Totals model", "College basketball, model 3+ pts off the opener, both teams 10+ games",
-     "55.0% / 56.1%", "2008-14 / 2015-21 backtest, 6,769 bets", "52.4%"),
+    ("Totals model, A", "College basketball, model 6+ pts off the opener, both teams 10+ games",
+     "59.4% / 60.5%", "2008-14 / 2015-21, 1,111 bets; ~59% half a point late", "52.4%"),
+    ("Totals model, B", "Same, 3-6 pts off; only near the opener",
+     "54.3% / 55.1%", "2008-14 / 2015-21, 5,658 bets; ~53% half a point late", "52.4%"),
     ("Teaser legs", "NFL 6-pt, dogs +1.5 to +2.5, total 48.5 or lower", "78.3%", "2006-25, 563 legs",
      "73.9% at -120"),
     ("Wind under", "NFL outdoor, 15+ mph at kickoff", "56.4%", "2006-25 vs closing totals, 459 games", "52.4%"),
@@ -72,13 +74,14 @@ def _demo_slates(now: datetime) -> list[dict]:
         {"sport": "ncaab", "tier": "BET", "kind": "ncaab_model", "game": "Wisconsin Badgers @ Purdue Boilermakers",
          "commence": t(0), "market": "totals", "selection": "Under 141.5", "side": "Under", "point": 141.5,
          "book": "fanduel", "price": -110, "fair_prob": 0.57, "ev": 0.088, "stake": 30, "limit_price": -129,
-         "limit_point": 138.0, "reasons": ["Model total 134.8, 6.7 pts below the line.",
-                                           "Backtested win rate at this gap: 57.0%."]},
+         "limit_point": 138.0, "grade": "A", "reasons": ["Model total 134.8, 6.7 pts below the line.",
+                                           "Backtested win rate at this gap: 58.0%."]},
         {"sport": "ncaab", "tier": "BET", "kind": "ncaab_model", "game": "Baylor Bears @ Iowa State Cyclones",
          "commence": t(1), "market": "totals", "selection": "Over 137.5", "side": "Over", "point": 137.5,
          "book": "draftkings", "price": -108, "fair_prob": 0.537, "ev": 0.034, "stake": 13, "limit_price": -113,
-         "limit_point": 138.5, "reasons": ["Model total 141.6, 4.1 pts above the line.",
-                                           "Backtested win rate at this gap: 53.7%."]},
+         "limit_point": 138.5, "grade": "B", "reasons": ["Model total 141.6, 4.1 pts above the line.",
+                                           "Backtested win rate at this gap: 53.7%.",
+                                           "B play: only bet near the opener. If the total has moved half a point your way, pass."]},
         {"sport": "ncaab", "tier": "BET", "kind": "price", "game": "Creighton Bluejays @ Marquette Golden Eagles",
          "commence": t(1.5), "market": "spreads", "selection": "Creighton Bluejays +4.5", "side": "Creighton Bluejays",
          "point": 4.5, "book": "draftkings", "price": -105, "fair_prob": 0.53, "ev": 0.035, "stake": 9,
@@ -170,6 +173,9 @@ def _stats(rows: list[dict]) -> dict:
 def _slip(b: dict) -> str:
     sport = SPORT_LABEL.get(b["sport"], b["sport"].upper())
     kind = KIND_LABEL.get(b["kind"], "Bet")
+    grade = b.get("grade")
+    badge = (f'<span class="grade grade-{e(grade.lower())}" title="{"6+ pts off: ~60% in testing" if grade == "A" else "3-6 pts off: ~54% in testing"}">'
+             f'{e(grade)} play</span>') if grade else ""
     limits = []
     if b.get("limit_point") is not None:
         word = "up to" if b["side"] == "Over" else "down to"   # the direction the line gets worse
@@ -182,7 +188,7 @@ def _slip(b: dict) -> str:
     return f"""
 <article class="slip" aria-label="{e(b['selection'])}">
   <div class="slip-main">
-    <div class="slip-meta"><span class="chip chip-{e(b['sport'])}">{e(sport)}</span><span class="kind">{e(kind)}</span>
+    <div class="slip-meta"><span class="chip chip-{e(b['sport'])}">{e(sport)}</span><span class="kind">{e(kind)}</span>{badge}
       <time>{e(_when(b['commence']))}</time></div>
     <p class="game">{e(b['game'])}</p>
     <p class="pick">{e(b['selection'])}</p>
@@ -407,6 +413,8 @@ section > *, .wrap > * {{ min-width: 0; }}
   color: var(--accent-ink); background: var(--ncaab); }}
 .chip-nfl {{ background: var(--nfl); }}
 .kind {{ font-weight: 600; color: var(--ink); }}
+.grade {{ font: 700 12px/1 var(--f-num); padding: 4px 7px; border-radius: 4px; border: 1.5px solid currentColor; }}
+.grade-a {{ color: var(--win); }} .grade-b {{ color: var(--muted); }}
 .slip-meta time {{ margin-left: auto; font-variant-numeric: tabular-nums; }}
 .game {{ margin: 2px 0 0; color: var(--muted); }}
 .pick {{ margin: 0; font: 700 30px/1.05 var(--f-display); letter-spacing: 0.01em; text-wrap: balance; }}

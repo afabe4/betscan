@@ -89,8 +89,28 @@ class Signal(unittest.TestCase):
     def test_calibration(self):
         self.assertIsNone(calibrated(2.5))
         self.assertAlmostEqual(calibrated(3.2), 0.534)
-        self.assertAlmostEqual(calibrated(-7), 0.57)
+        self.assertAlmostEqual(calibrated(-7), 0.58)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Grades(unittest.TestCase):
+    def test_b_play_passes_once_line_moved(self):
+        g, r = Signal._setup(Signal(), 12)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        idx = NameIndex(r.o)
+        mt = sum(r.project("Home U", "Away U", False))
+        # put the line 4 pts under the model: a B play
+        for b in g.books.values():
+            b["totals"] = [Outcome("Over", -110, round(mt - 4)), Outcome("Under", -110, round(mt - 4))]
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIn("grade B", totals_signal(g, cands, r, idx, 0.0).detail)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIn("pass", totals_signal(g, cands, r, idx, 1.0).detail)
+        # 7 pts off: an A play even after a move
+        for b in g.books.values():
+            b["totals"] = [Outcome("Over", -110, round(mt - 7)), Outcome("Under", -110, round(mt - 7))]
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIn("grade A", totals_signal(g, cands, r, idx, 1.0).detail)

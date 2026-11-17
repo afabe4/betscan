@@ -20,7 +20,12 @@ MIN_GAMES = 10
 MIN_EDGE = 3.0
 # Win rate by |model - line|, from the backtest at 0.5 pt worse than the opener
 # (deliberately the pessimistic column: you rarely get the true opener).
-CALIBRATION = ((3.0, 0.534), (4.0, 0.537), (5.0, 0.537), (6.0, 0.57))   # 6+ shrunk from 58.9%
+CALIBRATION = ((3.0, 0.534), (4.0, 0.537), (5.0, 0.537), (6.0, 0.58))   # 6+ shrunk from 58.9%
+# Grades. A plays (6+ pts off) won 59.4% / 60.5% at the opener and ~59% half a point late.
+# B plays (3-6) won 54-55% at the opener but only 52.7-54.0% half a point late, so they're
+# only bets while the line is still near where we first saw it.
+A_EDGE = 6.0
+B_MAX_MOVE = 0.5
 
 ESPN_CBB = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard"
 
@@ -133,6 +138,10 @@ def totals_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, moved: fl
         edge = (model_total - c.point) * (1 if side == "Over" else -1)
         if edge < MIN_EDGE:
             continue
+        if edge < A_EDGE and moved is not None and moved >= B_MAX_MOVE:
+            return Signal("ncaab_model", "totals", side, 0.0,
+                          f"{head}: {side} {c.point:g} is {edge:.1f} pts off, a B play, but the total has "
+                          f"already moved {moved:.1f} this way. B plays only hold up near the opener: pass")
         p = calibrated(edge)
         c.fair_prob = p
         c.ev = expected_value(p, c.best_price)
@@ -144,6 +153,7 @@ def totals_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, moved: fl
     note = ""
     if moved is not None and moved >= 1.0:
         note = f"; the total has already moved {moved:.1f} toward this side since first seen, so this is not the opener"
+    grade = "A" if edge >= A_EDGE else "B"
     return Signal("ncaab_model", "totals", side, 0.0,
-                  f"{head}: {side} {c.point:g} is {edge:.1f} pts off the model -> backtested win rate "
-                  f"{p:.1%} (both teams {MIN_GAMES}+ games, near the opener){note}")
+                  f"{head}: {side} {c.point:g} is {edge:.1f} pts off the model -> grade {grade}, backtested "
+                  f"win rate {p:.1%} (both teams {MIN_GAMES}+ games, near the opener){note}")
