@@ -135,3 +135,16 @@ class Early(unittest.TestCase):
         g12, r12 = Signal._setup(Signal(), 12)
         cands = {(c.market, c.side): c for c in price_candidates(g12, ("draftkings", "fanduel"))}
         self.assertIsNone(early_signal(g12, cands, r12, NameIndex(r12.o), tv, 11))  # 10+ games: regular model
+
+
+class EarlySlip(unittest.TestCase):
+    def test_limits_use_torvik_total_and_breakeven_price(self):
+        from betscan.models import Candidate, Game, Signal as Sig
+        from betscan.slate import bet_entry
+        g = Game("x", "ncaab", datetime(2026, 11, 18, 2, tzinfo=timezone.utc), "UC Davis Aggies", "Alabama St Hornets")
+        c = Candidate(g, "totals", "Over", 142.5, "fanduel", -112, 0.53, 0.003, tier="EARLY")
+        c.signals = [Sig("ncaab_model", "totals", "Over", 0.0, "model total 139.0 (...) - context only"),
+                     Sig("ncaab_early", "totals", "Over", 0.0, "Torvik total 147.9 (UC Davis vs Alabama St.): Over")]
+        b = bet_entry(c, 0.015)
+        self.assertEqual(b["limit_point"], 144.5)    # 147.9 - 3, rounded down to a half point
+        self.assertEqual(b["limit_price"], -113)     # break-even at 53%

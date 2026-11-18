@@ -58,9 +58,10 @@ def _limit_point(c: Candidate, model_total: float | None, min_edge: float) -> fl
 
 
 def _model_total(c: Candidate) -> float | None:
+    """The total behind the pick: Torvik's for early plays, the model's otherwise."""
+    want = ("ncaab_early", "Torvik total ") if play_kind(c) == "early" else ("ncaab_model", "model total ")
     for s in c.signals:
-        if (s.kind == "ncaab_model" and s.detail.startswith("model total ")) or \
-                (s.kind == "ncaab_early" and s.detail.startswith("Torvik total ")):
+        if s.kind == want[0] and s.detail.startswith(want[1]):
             try:
                 return float(s.detail.split()[2])
             except ValueError:
@@ -112,12 +113,13 @@ def _grade(c: Candidate) -> str | None:
 def bet_entry(c: Candidate, min_ev: float, min_edge: float = 3.0) -> dict:
     mt = _model_total(c)
     grade = _grade(c)
+    early = play_kind(c) == "early"
     return {
         "sport": c.game.sport, "tier": c.tier, "kind": play_kind(c), "game": c.game.label,
         "home": c.game.home, "away": c.game.away, "commence": c.game.commence.isoformat(),
         "market": c.market, "selection": c.selection, "side": c.side, "point": c.point,
         "book": c.best_book, "price": c.best_price, "fair_prob": c.fair_prob, "ev": c.ev,
-        "stake": c.stake, "limit_price": _limit_price(c.fair_prob, min_ev),
+        "stake": c.stake, "limit_price": _limit_price(c.fair_prob, 0.0 if early else min_ev),
         "limit_point": _limit_point(c, mt, min_edge), "reasons": reasons(c), "grade": grade,
     }
 
