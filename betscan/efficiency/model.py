@@ -82,21 +82,31 @@ def _norm(s: str) -> str:
 def resolve_name(odds_name: str, provider_names: list[str]) -> str | None:
     """Map 'Michigan State Spartans' -> 'Michigan St.' etc. Prefers the longest
     provider name that is a word-prefix of the odds name, so 'Michigan' never
-    steals 'Michigan State'."""
-    target = _norm(odds_name)
+    steals 'Michigan State'. The name as written is tried before any alias
+    expansion, so 'SMU Mustangs' finds 'SMU' rather than 'Southern'."""
+    norm = {_norm(p): p for p in provider_names}
+
+    def longest_prefix(target):
+        best = None
+        for n, orig in norm.items():
+            if target == n or target.startswith(n + " "):
+                if best is None or len(n) > len(best[0]):
+                    best = (n, orig)
+        return best[1] if best else None
+
+    raw = _norm(odds_name)
+    hit = longest_prefix(raw)
+    if hit:
+        return hit
+    target = raw
     for short, full in _ALIASES.items():
         if target == short or target.startswith(short + " "):
             target = full + target[len(short):]
-    norm = {_norm(p): p for p in provider_names}
-    best = None
-    for n, orig in norm.items():
-        if target == n or target.startswith(n + " "):
-            if best is None or len(n) > len(best[0]):
-                best = (n, orig)
-    if best:
-        return best[1]
-    hit = difflib.get_close_matches(target, list(norm), n=1, cutoff=0.85)
-    return norm[hit[0]] if hit else None
+    hit = longest_prefix(target)
+    if hit:
+        return hit
+    close = difflib.get_close_matches(target, list(norm), n=1, cutoff=0.85)
+    return norm[close[0]] if close else None
 
 
 # --- projection ------------------------------------------------------------

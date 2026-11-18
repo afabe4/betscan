@@ -123,3 +123,12 @@ class Signal(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NamesRaw(unittest.TestCase):
+    def test_plain_name_before_alias(self):
+        names = ["SMU", "Southern", "UNLV", "Nevada", "Kansas", "Kansas St."]
+        self.assertEqual(resolve_name("SMU Mustangs", names), "SMU")
+        self.assertEqual(resolve_name("UNLV Rebels", names), "UNLV")
+        self.assertEqual(resolve_name("Kansas Jayhawks", names), "Kansas")
+        self.assertEqual(resolve_name("Kansas State Wildcats", names), "Kansas St.")

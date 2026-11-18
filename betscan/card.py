@@ -17,13 +17,15 @@ from .store import Store
 
 ET = ZoneInfo("America/New_York")
 SPORT_LABEL = {"ncaab": "College hoops", "nfl": "NFL"}
-KIND_LABEL = {"ncaab_model": "Totals model", "wind": "Wind under", "price": "Price edge", "teaser": "Teaser legs"}
+KIND_LABEL = {"early": "Early totals", "ncaab_model": "Totals model", "wind": "Wind under", "price": "Price edge", "teaser": "Teaser legs"}
 # What each play did in testing; shown so the record has something to be judged against.
 REFERENCE = [
     ("Totals model, A", "College basketball, model 6+ pts off the opener, both teams 10+ games",
      "59.4% / 60.5%", "2008-14 / 2015-21, 1,111 bets; ~59% half a point late", "52.4%"),
     ("Totals model, B", "Same, 3-6 pts off; only near the opener",
      "54.3% / 55.1%", "2008-14 / 2015-21, 5,658 bets; ~53% half a point late", "52.4%"),
+    ("Early totals", "November only: Torvik total 3+ pts off, before teams have 10 games",
+     "54.8%", "2015-20, 1,428 bets; 53.0% in 2018-20, ~52% half a point late", "52.4%"),
     ("Teaser legs", "NFL 6-pt, dogs +1.5 to +2.5, total 48.5 or lower", "78.3%", "2006-25, 563 legs",
      "73.9% at -120"),
     ("Wind under", "NFL outdoor, 15+ mph at kickoff", "56.4%", "2006-25 vs closing totals, 459 games", "52.4%"),
@@ -54,6 +56,8 @@ def _when(iso: str) -> str:
 
 def _kind_of_pick(p: dict) -> str:
     kinds = set((p.get("kinds") or "").split(","))
+    if p.get("tier") == "EARLY" or "ncaab_early" in kinds:
+        return "early"
     if p["market"] == "teaser" or "teaser" in kinds:
         return "teaser"
     if "ncaab_model" in kinds and p["market"] == "totals":
@@ -123,7 +127,7 @@ def _record(st: Settings, demo: bool, now: datetime) -> list[dict]:
         return _demo_record(now)
     if not st.db_path.exists():
         return []
-    picks = Store(st.db_path).picks("tier IN ('BET', 'TEASER') AND result IS NOT NULL")
+    picks = Store(st.db_path).picks("tier IN ('BET', 'EARLY', 'TEASER') AND result IS NOT NULL")
     return sorted(picks, key=lambda p: p["commence"])
 
 
@@ -174,8 +178,11 @@ def _slip(b: dict) -> str:
     sport = SPORT_LABEL.get(b["sport"], b["sport"].upper())
     kind = KIND_LABEL.get(b["kind"], "Bet")
     grade = b.get("grade")
-    badge = (f'<span class="grade grade-{e(grade.lower())}" title="{"6+ pts off: ~60% in testing" if grade == "A" else "3-6 pts off: ~54% in testing"}">'
-             f'{e(grade)} play</span>') if grade else ""
+    titles = {"A": "6+ pts off: ~60% in testing", "B": "3-6 pts off: ~54% in testing",
+              "Early": "November only: ~53% in testing, close to break-even"}
+    text = "Early · small stake" if grade == "Early" else f"{grade} play"
+    badge = (f'<span class="grade grade-{e((grade or "").lower())}" title="{titles.get(grade, "")}">'
+             f'{e(text)}</span>') if grade else ""
     limits = []
     if b.get("limit_point") is not None:
         word = "up to" if b["side"] == "Over" else "down to"   # the direction the line gets worse
@@ -290,7 +297,7 @@ grades it against the final score and the closing line, and your record builds h
     for r in rows:
         groups[_kind_of_pick(r)].append(r)
     by = []
-    for kind in ("ncaab_model", "price", "wind", "teaser"):
+    for kind in ("ncaab_model", "early", "price", "wind", "teaser"):
         g = groups.get(kind)
         if not g:
             continue
@@ -414,7 +421,7 @@ section > *, .wrap > * {{ min-width: 0; }}
 .chip-nfl {{ background: var(--nfl); }}
 .kind {{ font-weight: 600; color: var(--ink); }}
 .grade {{ font: 700 12px/1 var(--f-num); padding: 4px 7px; border-radius: 4px; border: 1.5px solid currentColor; }}
-.grade-a {{ color: var(--win); }} .grade-b {{ color: var(--muted); }}
+.grade-a {{ color: var(--win); }} .grade-b {{ color: var(--muted); }} .grade-early {{ color: var(--accent); }}
 .slip-meta time {{ margin-left: auto; font-variant-numeric: tabular-nums; }}
 .game {{ margin: 2px 0 0; color: var(--muted); }}
 .pick {{ margin: 0; font: 700 30px/1.05 var(--f-display); letter-spacing: 0.01em; text-wrap: balance; }}

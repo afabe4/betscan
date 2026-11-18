@@ -112,6 +112,13 @@ def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ra
             sig = totals_signal(g, cands, ncaab[0], ncaab[1], moved if store else None)
             if sig:
                 _attach(cands, sig)
+            if len(ncaab) > 2:
+                from .ncaab.live import early_signal
+                from zoneinfo import ZoneInfo
+                month = g.commence.astimezone(ZoneInfo("America/New_York")).month
+                early = early_signal(g, cands, ncaab[0], ncaab[1], ncaab[2], month)
+                if early:
+                    _attach(cands, early)
         # NFL wind uses historical rates when available; the heuristic is the offline fallback.
         wind = wind_adjust(g, cands, rates, now, _moved_toward(store, g, "totals", "Under"))
         if wind:
@@ -136,6 +143,9 @@ def analyze(games: list[Game], settings: Settings, now: datetime, store=None, ra
             _attach(cands, sig)
         for c in cands.values():
             score_candidate(c, settings)
+            if any(x.kind == "ncaab_early" for x in c.signals):   # always small fixed stake
+                from .ncaab.live import EARLY_STAKE_PCT
+                c.tier, c.stake = "EARLY", round(settings.bankroll * EARLY_STAKE_PCT, 2)
             results.append(c)
     results.sort(key=lambda c: ({"BET": 0, "VERIFY": 1, "LEAN": 2, "WATCH": 3}.get(c.tier, 9), -c.score))
     return results

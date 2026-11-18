@@ -14,7 +14,7 @@ from .models import Candidate
 from .odds_math import decimal_to_american
 
 KIND_LABEL = {
-    "ncaab_model": "Totals model", "wind": "Wind under", "price": "Price edge",
+    "ncaab_model": "Totals model", "early": "Early totals", "wind": "Wind under", "price": "Price edge",
     "teaser": "Teaser", "injury": "Injury", "news": "News", "model": "Efficiency model",
 }
 
@@ -30,6 +30,8 @@ def _book_name(key: str) -> str:
 
 def play_kind(c: Candidate) -> str:
     kinds = {s.kind for s in c.signals}
+    if "ncaab_early" in kinds and c.market == "totals":
+        return "early"
     if "ncaab_model" in kinds and c.market == "totals":
         return "ncaab_model"
     if "wind" in kinds and c.side == "Under":
@@ -57,7 +59,8 @@ def _limit_point(c: Candidate, model_total: float | None, min_edge: float) -> fl
 
 def _model_total(c: Candidate) -> float | None:
     for s in c.signals:
-        if s.kind == "ncaab_model" and s.detail.startswith("model total "):
+        if (s.kind == "ncaab_model" and s.detail.startswith("model total ")) or \
+                (s.kind == "ncaab_early" and s.detail.startswith("Torvik total ")):
             try:
                 return float(s.detail.split()[2])
             except ValueError:
@@ -68,6 +71,11 @@ def _model_total(c: Candidate) -> float | None:
 def reasons(c: Candidate) -> list[str]:
     out = []
     kind = play_kind(c)
+    if kind == "early":
+        mt = _model_total(c)
+        out.append(f"Torvik total {mt:.1f}, {abs(mt - c.point):.1f} pts {'above' if c.side == 'Over' else 'below'} the line.")
+        out.append("Early-season play: tested about 53% in November, close to break-even. Small fixed stake.")
+        return out
     if kind == "ncaab_model":
         mt = _model_total(c)
         gap = abs((mt or 0) - (c.point or 0))
@@ -93,6 +101,8 @@ def reasons(c: Candidate) -> list[str]:
 
 
 def _grade(c: Candidate) -> str | None:
+    if c.tier == "EARLY":
+        return "Early"
     for s in c.signals:
         if s.kind == "ncaab_model" and "-> grade " in s.detail:
             return s.detail.split("-> grade ")[1][0]
@@ -123,7 +133,7 @@ def watch_entry(c: Candidate) -> dict:
 
 def write(path: Path, sport: str, cands: list[Candidate], teasers, now: datetime, min_ev: float,
           credits_left: str | None):
-    bets = [bet_entry(c, min_ev) for c in cands if c.game.sport == sport and c.tier == "BET"]
+    bets = [bet_entry(c, min_ev) for c in cands if c.game.sport == sport and c.tier in ("BET", "EARLY")]
     watch = [watch_entry(c) for c in cands if c.game.sport == sport and c.tier in ("VERIFY", "LEAN", "WATCH")]
     tz = [{"book": t.book, "price": t.price, "prob": t.prob, "ev": t.ev, "stake": t.stake,
            "legs": [{"game": leg.game.label, "side": leg.side, "point": leg.point, "teased": leg.teased,

@@ -157,3 +157,42 @@ def totals_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, moved: fl
     return Signal("ncaab_model", "totals", side, 0.0,
                   f"{head}: {side} {c.point:g} is {edge:.1f} pts off the model -> grade {grade}, backtested "
                   f"win rate {p:.1%} (both teams {MIN_GAMES}+ games, near the opener){note}")
+
+
+# --- early season (November only) -----------------------------------------------
+# User-requested, deliberately marginal. Torvik's total 3+ pts off the opener in November
+# won 54.8% (1,428 bets, 2015-20) but only 53.0% in 2018-20, and ~52% half a point late;
+# December was 51.0%. So: November only, small fixed stakes, tracked as its own play.
+EARLY_RATE = 0.53
+EARLY_MIN_EDGE = 3.0
+EARLY_STAKE_PCT = 0.005
+
+
+def early_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, torvik, when_et_month: int) -> Signal | None:
+    if game.sport != "ncaab" or r is None or torvik is None or when_et_month != 11:
+        return None
+    h, a = idx.find(game.home), idx.find(game.away)
+    if not h or not a or min(r.games.get(h, 0), r.games.get(a, 0)) >= MIN_GAMES:
+        return None   # the regular model takes over at 10 games
+    th, ta = torvik.find(h), torvik.find(a)
+    if not th or not ta:
+        return None
+    from ..efficiency.model import project
+    ph, pa = project(torvik, th, ta, game.neutral)
+    tv_total = ph + pa
+    best = None
+    for side in ("Over", "Under"):
+        c = cands.get(("totals", side))
+        if not c or c.point is None or c.best_price is None:
+            continue
+        edge = (tv_total - c.point) * (1 if side == "Over" else -1)
+        if edge < EARLY_MIN_EDGE or expected_value(EARLY_RATE, c.best_price) < 0:
+            continue
+        best = (side, edge, c)
+    if not best:
+        return None
+    side, edge, c = best
+    c.fair_prob, c.ev, c.approx = EARLY_RATE, expected_value(EARLY_RATE, c.best_price), False
+    return Signal("ncaab_early", "totals", side, 0.0,
+                  f"Torvik total {tv_total:.1f} ({th.name} vs {ta.name}): {side} {c.point:g} is {edge:.1f} pts off. "
+                  f"Early-season play: tested ~53%, close to break-even; small fixed stake")

@@ -114,3 +114,24 @@ class Grades(unittest.TestCase):
             b["totals"] = [Outcome("Over", -110, round(mt - 7)), Outcome("Under", -110, round(mt - 7))]
         cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
         self.assertIn("grade A", totals_signal(g, cands, r, idx, 1.0).detail)
+
+
+class Early(unittest.TestCase):
+    def test_november_only_and_hands_off_at_10_games(self):
+        from betscan.efficiency.model import RatingSet, TeamRating
+        from betscan.ncaab.live import early_signal
+        g, r = Signal._setup(Signal(), 2)          # 2 games played: early window
+        tv = RatingSet("ncaab", "t", "per_poss", {
+            "Home U": TeamRating("Home U", 120, 110, 72), "Away U": TeamRating("Away U", 118, 112, 72)},
+            league_off=105, league_pace=68)
+        idx = NameIndex(r.o)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        sig = early_signal(g, cands, r, idx, tv, 11)
+        self.assertIsNotNone(sig)
+        self.assertEqual(sig.side, "Over")          # Torvik total ~170 vs line 140.5
+        self.assertAlmostEqual(cands[("totals", "Over")].fair_prob, 0.53)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIsNone(early_signal(g, cands, r, idx, tv, 12))        # December: off
+        g12, r12 = Signal._setup(Signal(), 12)
+        cands = {(c.market, c.side): c for c in price_candidates(g12, ("draftkings", "fanduel"))}
+        self.assertIsNone(early_signal(g12, cands, r12, NameIndex(r12.o), tv, 11))  # 10+ games: regular model

@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS injuries (
 BASELINE = "1970-01-01T00:00:00+00:00"   # status already in place when tracking started
 # Lower = stronger. A pick that upgrades (WATCH -> BET) is re-recorded at the
 # price available when it upgraded; otherwise the first sighting is kept.
-TIER_RANK = {"BET": 0, "TEASER": 1, "VERIFY": 2, "ALT": 3, "LEAN": 4, "WATCH": 5, "MODEL": 6}
+TIER_RANK = {"BET": 0, "EARLY": 1, "TEASER": 1, "VERIFY": 2, "ALT": 3, "LEAN": 4, "WATCH": 5, "MODEL": 6}
 PICK_COLS = ("ts", "game_id", "sport", "label", "home", "away", "commence", "market", "side", "point",
              "selection", "book", "price", "fair_prob", "ev", "score", "tier", "stake", "kinds")
 

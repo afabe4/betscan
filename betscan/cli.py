@@ -160,7 +160,7 @@ def scan(a, p) -> int:
             from .ncaab.live import NameIndex, build_ratings
             try:
                 r = build_ratings(fetcher, now, log=_log)
-                ncaab = (r, NameIndex(r.o))
+                ncaab = (r, NameIndex(r.o), ratings)
             except Exception as e:  # noqa: BLE001
                 _log(f"  [ncaab] model unavailable: {e}")
         all_cands += analyze(games, st, now, store, ratings, rates if code == "nfl" else None, ncaab)
@@ -168,9 +168,9 @@ def scan(a, p) -> int:
             nfl_games += games
 
     dedupe_correlated(all_cands)
-    order = {"BET": 0, "VERIFY": 1, "ALT": 2, "LEAN": 3, "WATCH": 4}
+    order = {"BET": 0, "EARLY": 1, "VERIFY": 2, "ALT": 3, "LEAN": 4, "WATCH": 5}
     all_cands.sort(key=lambda c: (order.get(c.tier, 9), -c.score))
-    tiers = ("BET", "VERIFY", "ALT", "LEAN", "WATCH") if a.all else ("BET", "VERIFY", "ALT", "LEAN")
+    tiers = ("BET", "EARLY", "VERIFY", "ALT", "LEAN", "WATCH") if a.all else ("BET", "EARLY", "VERIFY", "ALT", "LEAN")
     print(report.terminal(all_cands, show=tiers))
 
     legs = (teaser_legs(nfl_games, rates, include_favs=a.teaser_favs, bet_books=st.bet_books)
