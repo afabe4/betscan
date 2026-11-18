@@ -487,6 +487,7 @@ td:not(.rc-pick), thead th {{ white-space: nowrap; }}
 .w-tier {{ font: 600 11px/1 var(--f-body); letter-spacing: 0.08em; padding: 5px 0; border-radius: 4px; text-align: center;
   border: 1px solid var(--line); color: var(--muted); align-self: start; }}
 .w-verify {{ color: var(--loss); border-color: var(--loss); }}
+.w-also {{ color: var(--win); border-color: var(--win); }}
 .w-sel {{ font-weight: 600; }} .w-sel span {{ font-weight: 400; color: var(--muted); font-family: var(--f-num); font-size: 13px; }}
 .w-game, .w-note {{ font-size: 13px; color: var(--muted); }}
 .w-none {{ display: block !important; color: var(--muted); }}
@@ -520,7 +521,7 @@ td:not(.rc-pick), thead th {{ white-space: nowrap; }}
     {_record_html(record)}
   </section>
   <section aria-labelledby="h-watch">
-    <h2 id="h-watch">Watch list <small>close, but not bets</small></h2>
+    <h2 id="h-watch">Watch list <small>also qualified, or close</small></h2>
     <ul class="watch">{watch_html}</ul>
   </section>
   <section aria-labelledby="h-ref">

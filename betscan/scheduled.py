@@ -52,13 +52,23 @@ def run(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="betscan run")
     ap.add_argument("--sports", default="ncaab")
     ap.add_argument("--card", type=Path, required=True)
+    ap.add_argument("--top", type=int, default=None, help="daily mode: report the N best bets")
+    ap.add_argument("--hours", type=int, default=None)
+    ap.add_argument("--lines-only", action="store_true", help="closing-line snapshot; no new picks")
     a = ap.parse_args(argv)
     st = Settings()
     now = datetime.now(timezone.utc)
     codes = [c.strip() for c in a.sports.split(",")]
 
     before = {_key(b) for c in codes for b in _bets(st.cache_dir / f"latest_{c}.json")}
-    rc = cli_main(["scan", "--sports", a.sports])
+    args = ["scan", "--sports", a.sports]
+    if a.top is not None:
+        args += ["--top", str(a.top)]
+    if a.hours:
+        args += ["--hours", str(a.hours)]
+    if a.lines_only:
+        args += ["--lines-only"]
+    rc = cli_main(args)
     if rc:
         print(f"ERROR: scan failed with code {rc}")
         return rc
@@ -71,13 +81,26 @@ def run(argv: list[str]) -> int:
 
     current = [b for c in codes for b in _bets(st.cache_dir / f"latest_{c}.json")]
     new = [b for b in current if _key(b) not in before]
+
+    def one(b):
+        book = {"draftkings": "DraftKings", "fanduel": "FanDuel"}.get(b["book"], b["book"])
+        price = f"+{b['price']:.0f}" if b["price"] > 0 else f"{b['price']:.0f}"
+        grade = f" ({b['grade']})" if b.get("grade") else ""
+        stake = f" ${b['stake']:.0f}" if b.get("stake") else ""
+        return f"{b['game']}: {b['selection']} {price} {book}{stake}{grade}"
+    if a.lines_only:
+        print("SNAPSHOT: closing lines saved")
+        return 0
+    if a.top is not None:   # daily mode: always report today's list, best first
+        best = sorted(current, key=lambda b: -(b.get("ev") or 0))
+        if best:
+            print(f"DAILY: today's {len(best)} best bet{'s' if len(best) > 1 else ''}: "
+                  + "; ".join(one(b) for b in best))
+        else:
+            print("DAILY: no bets today")
+        return 0
     print(f"  [run] {len(current)} bets on the card, {len(new)} new, pruned {pruned} old line rows")
     if new:
-        def one(b):
-            book = {"draftkings": "DraftKings", "fanduel": "FanDuel"}.get(b["book"], b["book"])
-            price = f"+{b['price']:.0f}" if b["price"] > 0 else f"{b['price']:.0f}"
-            grade = f" ({b['grade']})" if b.get("grade") else ""
-            return f"{b['selection']} {price} {book}{grade}"
         print(f"ALERT: {len(new)} new bet{'s' if len(new) > 1 else ''}: " + "; ".join(one(b) for b in new))
     else:
         print(f"QUIET: no new bets ({len(current)} still on the card)")

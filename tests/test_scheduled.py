@@ -47,3 +47,24 @@ class State(unittest.TestCase):
             self.assertEqual(set(sizes), {"snapshots.sqlite", "latest_ncaab.json"})
             self.assertFalse((Path(b).parent / "evil.py").exists())
             self.assertEqual((Path(b) / "latest_ncaab.json").read_text(), '{"bets": []}')
+
+
+class TopN(unittest.TestCase):
+    def test_top_n_demotes_the_rest(self):
+        from datetime import timedelta
+        from betscan.config import Settings
+        from betscan.engine import analyze
+        from betscan.models import Game, Outcome
+        now = datetime(2027, 1, 20, tzinfo=timezone.utc)
+        games = []
+        for i, price in enumerate((120, 115, 110, 105)):     # Pinnacle fair ~50%; soft book plus-money = edge
+            g = Game(f"g{i}", "ncaab", now + timedelta(hours=5), f"Home{i}", f"Away{i}")
+            g.books = {"pinnacle": {"spreads": [Outcome(f"Home{i}", -105, -2.5), Outcome(f"Away{i}", -105, 2.5)]},
+                       "draftkings": {"spreads": [Outcome(f"Home{i}", price, -2.5), Outcome(f"Away{i}", -140, 2.5)]}}
+            games.append(g)
+        cands = analyze(games, Settings(bet_books=("draftkings",)), now)
+        ranked = sorted((c for c in cands if c.tier == "BET"), key=lambda c: -c.ev)
+        self.assertEqual(len(ranked), 4)
+        for c in ranked[2:]:      # what `scan --top 2` does
+            c.tier = "ALSO"
+        self.assertEqual([c.best_price for c in cands if c.tier == "BET"], [120, 115])

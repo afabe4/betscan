@@ -61,6 +61,10 @@ def main(argv=None) -> int:
     s.add_argument("--books", default=",".join(MY_BOOKS),
                    help="comma list of books you bet at ('us' = all US-regulated, 'all' = any). "
                         "Others are benchmark only")
+    s.add_argument("--top", type=int, default=None,
+                   help="keep only the N best bets by edge; the rest are listed as 'also qualified'")
+    s.add_argument("--lines-only", action="store_true",
+                   help="record line snapshots only (for closing lines); no new picks")
     s.add_argument("--all", action="store_true", help="also print WATCH tier")
     s.add_argument("--json", type=Path, help="write JSON results here")
     s.add_argument("--html", type=Path, help="write an HTML report here")
@@ -153,6 +157,9 @@ def scan(a, p) -> int:
             continue
         if store:
             store.record_lines(games, now)
+        if a.lines_only:
+            _log(f"  [lines-only] recorded {len(games)} games")
+            continue
         enrich(games, sport, ctx, now, log=_log, store=store)
         ratings = None if a.no_efficiency else ctx.ratings(sport, now, log=_log)
         ncaab = None
@@ -180,9 +187,15 @@ def scan(a, p) -> int:
     if nfl_games:
         print("\n" + report.teasers_text(legs, teasers, a.teaser_price, a.teaser3_price))
 
-    if store:
+    if a.top is not None:
+        ranked = sorted((c for c in all_cands if c.tier in ("BET", "EARLY")), key=lambda c: -(c.ev or 0))
+        for c in ranked[a.top:]:
+            c.tier, c.stake = "ALSO", 0.0      # qualified, but outside the daily top N
+    if a.lines_only:
+        legs = []
+    if store and not a.lines_only:
         store.record_picks(all_cands, now, legs)
-    if not a.demo:
+    if not a.demo and not a.lines_only:
         from . import slate
         for code in codes:
             slate.write(st.cache_dir / f"latest_{code}.json", code, all_cands, teasers, now, st.min_ev,

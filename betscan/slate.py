@@ -135,6 +135,8 @@ def watch_entry(c: Candidate) -> dict:
     note = sig.detail.split(" [")[0] if sig else ""
     if c.tier == "VERIFY":
         note = "Line is far from the market. Check it's live before betting. " + note
+    if c.tier == "ALSO":
+        note = f"Qualified ({(c.ev or 0) * 100:+.1f}% edge) but outside today's top picks."
     return {"sport": c.game.sport, "tier": c.tier, "game": c.game.label, "commence": c.game.commence.isoformat(),
             "selection": c.selection, "book": c.best_book, "price": c.best_price, "ev": c.ev, "note": note[:220]}
 
@@ -142,7 +144,9 @@ def watch_entry(c: Candidate) -> dict:
 def write(path: Path, sport: str, cands: list[Candidate], teasers, now: datetime, min_ev: float,
           credits_left: str | None):
     bets = [bet_entry(c, min_ev) for c in cands if c.game.sport == sport and c.tier in ("BET", "EARLY")]
-    watch = [watch_entry(c) for c in cands if c.game.sport == sport and c.tier in ("VERIFY", "LEAN", "WATCH")]
+    also = sorted((c for c in cands if c.game.sport == sport and c.tier == "ALSO"), key=lambda c: -(c.ev or 0))
+    watch = [watch_entry(c) for c in also] + \
+        [watch_entry(c) for c in cands if c.game.sport == sport and c.tier in ("VERIFY", "LEAN", "WATCH")]
     tz = [{"book": t.book, "price": t.price, "prob": t.prob, "ev": t.ev, "stake": t.stake,
            "legs": [{"game": leg.game.label, "side": leg.side, "point": leg.point, "teased": leg.teased,
                      "commence": leg.game.commence.isoformat()} for leg in t.legs]}
