@@ -37,6 +37,9 @@ def main(argv=None) -> int:
     if argv[:1] == ["run"]:
         from .scheduled import run
         return run(argv[1:])
+    if argv[:1] == ["state"]:
+        from .state import main as state_main
+        return state_main(argv[1:])
     p = argparse.ArgumentParser(prog="betscan", description="Scan NFL betting lines for mispriced games.")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("scan", help="scan upcoming games")

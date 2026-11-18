@@ -31,3 +31,19 @@ class Scheduled(unittest.TestCase):
             f.write_text(json.dumps({"bets": [b]}))
             self.assertEqual({_key(x) for x in _bets(f)}, {("A @ B", "totals", "Under")})
             self.assertEqual(_bets(Path(d) / "missing.json"), [])
+
+
+class State(unittest.TestCase):
+    def test_roundtrip_and_ignores_unknown_files(self):
+        from betscan.state import export, import_
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            Store(Path(a) / "snapshots.sqlite")
+            (Path(a) / "latest_ncaab.json").write_text('{"bets": []}')
+            export(Path(a), Path(a) / "state.json")
+            doc = json.loads((Path(a) / "state.json").read_text())
+            doc["files"]["../evil.py"] = "cHJpbnQoMSk="
+            (Path(a) / "state.json").write_text(json.dumps(doc))
+            sizes = import_(Path(a) / "state.json", Path(b))
+            self.assertEqual(set(sizes), {"snapshots.sqlite", "latest_ncaab.json"})
+            self.assertFalse((Path(b).parent / "evil.py").exists())
+            self.assertEqual((Path(b) / "latest_ncaab.json").read_text(), '{"bets": []}')

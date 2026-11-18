@@ -5,3 +5,4 @@ card.html
 data/http/
 !data/latest_*.json
 !data/card.html
+!data/state.json

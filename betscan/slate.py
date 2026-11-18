@@ -19,6 +19,15 @@ KIND_LABEL = {
 }
 
 
+BOOK_NAMES = {"draftkings": "DraftKings", "fanduel": "FanDuel", "betmgm": "BetMGM", "williamhill_us": "Caesars",
+              "espnbet": "ESPN BET", "betrivers": "BetRivers", "pinnacle": "Pinnacle", "lowvig": "LowVig",
+              "betonlineag": "BetOnline", "circasports": "Circa", "bovada": "Bovada", "fanatics": "Fanatics"}
+
+
+def _book_name(key: str) -> str:
+    return BOOK_NAMES.get(key, key.title())
+
+
 def play_kind(c: Candidate) -> str:
     kinds = {s.kind for s in c.signals}
     if "ncaab_model" in kinds and c.market == "totals":
@@ -71,9 +80,9 @@ def reasons(c: Candidate) -> list[str]:
         out.append(sig.detail.split(". ")[0].replace("forecast", "Forecast") + ".")
         out.append(f"Under's fair chance after the wind adjustment: {c.fair_prob:.1%}.")
     else:
-        ref = getattr(c, "ref_book", "the market")
-        ref = "Pinnacle" if ref == "pinnacle" else ref
-        out.append(f"{c.best_book.title() if c.best_book else 'Book'} beats {ref}'s no-vig line "
+        ref = getattr(c, "ref_book", None)
+        ref = "the market consensus" if ref in (None, "consensus") else _book_name(ref)
+        out.append(f"{_book_name(c.best_book) if c.best_book else 'Book'} beats {ref}'s no-vig line "
                    f"(fair {c.fair_prob:.1%}).")
     for s in c.signals:
         if s.kind in ("injury", "news") and s.strength:
