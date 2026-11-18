@@ -33,7 +33,9 @@ def play_kind(c: Candidate) -> str:
     kinds = {s.kind for s in c.signals}
     if "ncaab_early" in kinds and c.market == "totals":
         return "early"
-    if "ncaab_model" in kinds and c.market == "totals":
+    # Only a qualifying model play counts; a context-only model note (teams under 10 games)
+    # on a price-edge bet must not make it look like a model bet.
+    if c.market == "totals" and any(s.kind == "ncaab_model" and "-> grade " in s.detail for s in c.signals):
         return "ncaab_model"
     if "wind" in kinds and c.side == "Under":
         return "wind"

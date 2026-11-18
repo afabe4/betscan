@@ -55,7 +55,7 @@ class Settings:
     min_ev: float = 0.015           # 1.5% EV to call something a BET
     min_lean_score: float = 2.0     # situational score to call something a LEAN
     news_hours: int = 48            # how far back news/injury reports count
-    bankroll: float = 1000.0
+    bankroll: float = 100.0         # your bankroll in dollars; stakes scale with it
     kelly_mult: float = 0.25        # quarter Kelly
     max_stake_pct: float = 0.03     # cap any single stake at 3% of bankroll
     wind_mph: float = 15.0          # football wind threshold

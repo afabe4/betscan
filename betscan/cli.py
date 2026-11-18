@@ -50,7 +50,7 @@ def main(argv=None) -> int:
     s.add_argument("--regions", default=None,
                    help="Odds API regions (default: NFL us,eu for Pinnacle; NCAAB us = 2 credits/scan)")
     s.add_argument("--min-ev", type=float, default=1.5, help="min EV %% for a BET")
-    s.add_argument("--bankroll", type=float, default=1000.0)
+    s.add_argument("--bankroll", type=float, default=Settings().bankroll)
     s.add_argument("--kelly", type=float, default=0.25, help="Kelly multiplier")
     s.add_argument("--teaser-price", type=float, default=-120, help="your book's 2-team 6-pt teaser price")
     s.add_argument("--teaser3-price", type=float, default=160, help="your book's 3-team 6-pt teaser price")

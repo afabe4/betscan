@@ -133,7 +133,9 @@ class Store:
     def record_picks(self, candidates, ts: datetime, teaser_legs=()):
         for c in candidates:
             tier = c.tier
-            kinds = sorted({s.kind for s in c.signals})
+            # A context-only model note (teams under 10 games) isn't what the bet is based on.
+            kinds = sorted({s.kind for s in c.signals
+                            if not (s.kind == "ncaab_model" and "-> grade " not in s.detail)})
             if tier == "PASS" and "model" in kinds:
                 tier = "MODEL"     # shadow pick: tracks the context-only model vs the close
             if tier == "PASS":

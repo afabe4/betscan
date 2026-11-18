@@ -168,3 +168,19 @@ class EarlyFloor(unittest.TestCase):
             b["totals"] = [Outcome("Over", -105, 140.5), Outcome("Under", -115, 140.5)]
         cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
         self.assertIsNotNone(early_signal(g, cands, r, NameIndex(r.o), tv, 11))  # -105: 3.3% edge
+
+
+class PlayKind(unittest.TestCase):
+    def test_context_only_model_note_does_not_make_a_model_play(self):
+        from betscan.models import Candidate, Game, Signal as Sig
+        from betscan.slate import bet_entry, play_kind
+        g = Game("x", "ncaab", datetime(2026, 11, 19, tzinfo=timezone.utc), "Texas Tech", "New Orleans")
+        c = Candidate(g, "totals", "Over", 155.5, "draftkings", -105, 0.535, 0.044, tier="BET")
+        c.ref_book = "lowvig"
+        c.signals = [Sig("ncaab_model", "totals", "Over", 0.0,
+                         "model total 150.5 (...; games played 3/3) - context only until both teams have 10+ games")]
+        self.assertEqual(play_kind(c), "price")
+        self.assertTrue(bet_entry(c, 0.015)["reasons"][0].startswith("DraftKings beats LowVig"))
+        c.signals = [Sig("ncaab_model", "totals", "Over", 0.0,
+                         "model total 162.0 (...): Over 155.5 is 6.5 pts off the model -> grade A, backtested ...")]
+        self.assertEqual(play_kind(c), "ncaab_model")
