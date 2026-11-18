@@ -125,6 +125,8 @@ class Early(unittest.TestCase):
             "Home U": TeamRating("Home U", 120, 110, 72), "Away U": TeamRating("Away U", 118, 112, 72)},
             league_off=105, league_pace=68)
         idx = NameIndex(r.o)
+        for b in g.books.values():   # a price that clears the 1.3% floor
+            b["totals"] = [Outcome("Over", -105, 140.5), Outcome("Under", -115, 140.5)]
         cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
         sig = early_signal(g, cands, r, idx, tv, 11)
         self.assertIsNotNone(sig)
@@ -133,6 +135,8 @@ class Early(unittest.TestCase):
         cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
         self.assertIsNone(early_signal(g, cands, r, idx, tv, 12))        # December: off
         g12, r12 = Signal._setup(Signal(), 12)
+        for b in g12.books.values():
+            b["totals"] = [Outcome("Over", -105, 140.5), Outcome("Under", -115, 140.5)]
         cands = {(c.market, c.side): c for c in price_candidates(g12, ("draftkings", "fanduel"))}
         self.assertIsNone(early_signal(g12, cands, r12, NameIndex(r12.o), tv, 11))  # 10+ games: regular model
 
@@ -142,9 +146,25 @@ class EarlySlip(unittest.TestCase):
         from betscan.models import Candidate, Game, Signal as Sig
         from betscan.slate import bet_entry
         g = Game("x", "ncaab", datetime(2026, 11, 18, 2, tzinfo=timezone.utc), "UC Davis Aggies", "Alabama St Hornets")
-        c = Candidate(g, "totals", "Over", 142.5, "fanduel", -112, 0.53, 0.003, tier="EARLY")
+        c = Candidate(g, "totals", "Over", 142.5, "fanduel", -105, 0.53, 0.033, tier="EARLY")
         c.signals = [Sig("ncaab_model", "totals", "Over", 0.0, "model total 139.0 (...) - context only"),
                      Sig("ncaab_early", "totals", "Over", 0.0, "Torvik total 147.9 (UC Davis vs Alabama St.): Over")]
         b = bet_entry(c, 0.015)
         self.assertEqual(b["limit_point"], 144.5)    # 147.9 - 3, rounded down to a half point
-        self.assertEqual(b["limit_price"], -113)     # break-even at 53%
+        self.assertEqual(b["limit_price"], -109)     # 1.3% edge floor at 53%
+
+
+class EarlyFloor(unittest.TestCase):
+    def test_minus_110_is_below_the_floor(self):
+        from betscan.efficiency.model import RatingSet, TeamRating
+        from betscan.ncaab.live import early_signal
+        g, r = Signal._setup(Signal(), 2)
+        tv = RatingSet("ncaab", "t", "per_poss", {
+            "Home U": TeamRating("Home U", 120, 110, 72), "Away U": TeamRating("Away U", 118, 112, 72)},
+            league_off=105, league_pace=68)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIsNone(early_signal(g, cands, r, NameIndex(r.o), tv, 11))   # Over priced -110: 1.2% edge
+        for b in g.books.values():
+            b["totals"] = [Outcome("Over", -105, 140.5), Outcome("Under", -115, 140.5)]
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIsNotNone(early_signal(g, cands, r, NameIndex(r.o), tv, 11))  # -105: 3.3% edge

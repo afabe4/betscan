@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .models import Candidate
+from .ncaab.live import EARLY_MIN_EV
 from .odds_math import decimal_to_american
 
 KIND_LABEL = {
@@ -46,7 +47,11 @@ def _limit_price(fair: float | None, min_ev: float) -> int | None:
     dec = (1 + min_ev) / fair
     if dec <= 1.01:
         return None
-    return decimal_to_american(dec)
+    # Round toward the better price, so the limit itself still clears min_ev
+    # (-109.7 becomes -109, not -110).
+    if dec >= 2:
+        return math.ceil((dec - 1) * 100)
+    return math.ceil(-100 / (dec - 1))
 
 
 def _limit_point(c: Candidate, model_total: float | None, min_edge: float) -> float | None:
@@ -75,7 +80,8 @@ def reasons(c: Candidate) -> list[str]:
     if kind == "early":
         mt = _model_total(c)
         out.append(f"Torvik total {mt:.1f}, {abs(mt - c.point):.1f} pts {'above' if c.side == 'Over' else 'below'} the line.")
-        out.append("Early-season play: tested about 53% in November, close to break-even. Small fixed stake.")
+        out.append("Early-season play: tested about 53% in November. Small fixed stake, and only at a price "
+                   "with at least a 1.3% edge.")
         return out
     if kind == "ncaab_model":
         mt = _model_total(c)
@@ -119,7 +125,7 @@ def bet_entry(c: Candidate, min_ev: float, min_edge: float = 3.0) -> dict:
         "home": c.game.home, "away": c.game.away, "commence": c.game.commence.isoformat(),
         "market": c.market, "selection": c.selection, "side": c.side, "point": c.point,
         "book": c.best_book, "price": c.best_price, "fair_prob": c.fair_prob, "ev": c.ev,
-        "stake": c.stake, "limit_price": _limit_price(c.fair_prob, 0.0 if early else min_ev),
+        "stake": c.stake, "limit_price": _limit_price(c.fair_prob, EARLY_MIN_EV if early else min_ev),
         "limit_point": _limit_point(c, mt, min_edge), "reasons": reasons(c), "grade": grade,
     }
 

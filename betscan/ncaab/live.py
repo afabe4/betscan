@@ -166,6 +166,7 @@ def totals_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, moved: fl
 EARLY_RATE = 0.53
 EARLY_MIN_EDGE = 3.0
 EARLY_STAKE_PCT = 0.005
+EARLY_MIN_EV = 0.013   # user's floor: nothing under 1.3% edge (at 53% that means -109 or better)
 
 
 def early_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, torvik, when_et_month: int) -> Signal | None:
@@ -186,7 +187,7 @@ def early_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, torvik, wh
         if not c or c.point is None or c.best_price is None:
             continue
         edge = (tv_total - c.point) * (1 if side == "Over" else -1)
-        if edge < EARLY_MIN_EDGE or expected_value(EARLY_RATE, c.best_price) < 0:
+        if edge < EARLY_MIN_EDGE or expected_value(EARLY_RATE, c.best_price) < EARLY_MIN_EV:
             continue
         best = (side, edge, c)
     if not best:
