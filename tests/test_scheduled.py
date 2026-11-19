@@ -68,3 +68,19 @@ class TopN(unittest.TestCase):
         for c in ranked[2:]:      # what `scan --top 2` does
             c.tier = "ALSO"
         self.assertEqual([c.best_price for c in cands if c.tier == "BET"], [120, 115])
+
+
+class StatsExport(unittest.TestCase):
+    def test_rows_and_labels(self):
+        from betscan.stats import rows_from
+        base = {"rowid": 1, "commence": "2026-11-18T01:00:00+00:00", "sport": "ncaab", "label": "A @ B",
+                "market": "totals", "side": "Over", "selection": "Over 140.5", "book": "fanduel", "price": -110,
+                "stake": 0.5, "ev": 0.02, "kinds": "ncaab_early", "tier": "EARLY", "result": "W",
+                "profit": 0.909, "clv": -0.03}
+        r = rows_from([base])[0]
+        self.assertEqual((r["date"], r["play"], r["status"], r["book"]), ("2026-11-17", "Early totals", "Win", "FanDuel"))
+        self.assertAlmostEqual(r["dollars"], 0.45, places=2)
+        self.assertIs(r["beat_close"], False)
+        self.assertEqual((r["clv_pct"], r["edge_pct"]), (-3.0, 2.0))
+        pend = rows_from([{**base, "result": None, "profit": None, "clv": None, "tier": "BET", "kinds": ""}])[0]
+        self.assertEqual((pend["status"], pend["dollars"], pend["play"]), ("Pending", None, "Price edge"))
