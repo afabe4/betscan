@@ -109,7 +109,7 @@ def run(store: Store, fetcher, now: datetime | None = None) -> list[dict]:
     for p in started:
         upd = {}
         if p["clv"] is None:
-            snap = store.closing_snapshot(p["game_id"], p["commence"])
+            snap = store.closing_snapshot(p["game_id"], p["commence"], after=p["ts"])
             upd.update(closing_value(p, snap))
         if p["result"] is None and p["sport"] in ("nfl", "ncaab") and \
                 datetime.fromisoformat(p["commence"]) < now - timedelta(hours=4):

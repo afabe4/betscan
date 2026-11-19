@@ -76,10 +76,15 @@ class Store:
             out.append((datetime.fromisoformat(ts), pts[len(pts) // 2] if pts else None, prs[len(prs) // 2]))
         return out
 
-    def closing_snapshot(self, game_id: str, commence: str) -> dict[str, dict[str, list[tuple]]]:
-        """book -> market -> [(outcome, point, price)] at the last scan before kickoff."""
-        row = self.db.execute("SELECT MAX(ts) FROM lines WHERE game_id=? AND ts < ?",
-                              (game_id, commence)).fetchone()
+    def closing_snapshot(self, game_id: str, commence: str, after: str | None = None
+                         ) -> dict[str, dict[str, list[tuple]]]:
+        """book -> market -> [(outcome, point, price)] at the last scan before kickoff.
+
+        With `after` (when the pick was logged), only a scan later than that counts:
+        a game that tips before any later scan has no closing line to compare with.
+        """
+        row = self.db.execute("SELECT MAX(ts) FROM lines WHERE game_id=? AND ts < ? AND ts > ?",
+                              (game_id, commence, after or "")).fetchone()
         if not row or not row[0]:
             return {}
         out: dict = {}

@@ -168,3 +168,16 @@ class Card(unittest.TestCase):
             empty = render(st, now)
             self.assertIn("No bets on the card right now", empty)
             self.assertIn("No graded bets yet", empty)
+
+
+class NoLaterScan(unittest.TestCase):
+    def test_no_clv_without_a_scan_after_the_pick(self):
+        g = nfl_game("nl", spread=-2.5)
+        with tempfile.TemporaryDirectory() as d:
+            st = Store(Path(d) / "s.sqlite")
+            st.record_lines([g], NOW)
+            st.record_picks([Candidate(g, "spreads", "Chicago Bears", 2.5, "dk", -110, 0.55, 0.05, tier="BET")], NOW)
+            p = st.picks()[0]
+            self.assertEqual(st.closing_snapshot(g.id, g.commence.isoformat(), after=p["ts"]), {})
+            st.record_lines([g], NOW + timedelta(hours=1))
+            self.assertTrue(st.closing_snapshot(g.id, g.commence.isoformat(), after=p["ts"]))
