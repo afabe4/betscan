@@ -60,8 +60,9 @@ Every season 2008-09 to 2020-21 cleared 52.4% (worst 52.7%). Three things follow
 Spreads: the same model was 53.5% / 55.8% vs the opener in Jan-Mar but swung wildly by season (one season
 at 65.9%), so it's not used for bets. Torvik's AdjO/AdjD/tempo are shown as context.
 
-College scans use US books only (2 credits: spreads + totals x 1 region); the totals model supplies the
-fair price, so Pinnacle isn't needed. Lines for the next day typically post in the evening; four scans a
+College scans use US and EU books (4 credits: spreads + totals x 2 regions). The EU region brings
+Pinnacle, the sharp line price edges are measured against; it lists roughly 40% of college games,
+and LowVig/BetOnline are the reference for the rest. Lines for the next day typically post in the evening; four scans a
 day is ~240 credits/month:
 
 ```cron

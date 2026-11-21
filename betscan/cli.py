@@ -24,7 +24,7 @@ from .sources.odds_api import fetch_games
 from .store import Store
 
 
-SPORT_REGIONS = {"nfl": "us,eu", "ncaab": "us"}
+SPORT_REGIONS = {"nfl": "us,eu", "ncaab": "us,eu"}   # eu brings Pinnacle, the sharp reference line
 SPORT_HOURS = {"nfl": 168, "ncaab": 36}
 
 
