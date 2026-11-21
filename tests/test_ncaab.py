@@ -116,7 +116,18 @@ class Grades(unittest.TestCase):
         self.assertIn("grade A", totals_signal(g, cands, r, idx, 1.0).detail)
 
 
-class Early(unittest.TestCase):
+class _EarlyOn(unittest.TestCase):
+    """Early plays are off in production; these tests switch them on to check the logic."""
+    def setUp(self):
+        import betscan.ncaab.live as live
+        self._live, self._was = live, live.EARLY_ENABLED
+        live.EARLY_ENABLED = True
+
+    def tearDown(self):
+        self._live.EARLY_ENABLED = self._was
+
+
+class Early(_EarlyOn):
     def test_november_only_and_hands_off_at_10_games(self):
         from betscan.efficiency.model import RatingSet, TeamRating
         from betscan.ncaab.live import early_signal
@@ -154,7 +165,7 @@ class EarlySlip(unittest.TestCase):
         self.assertEqual(b["limit_price"], -109)     # 1.3% edge floor at 53%
 
 
-class EarlyFloor(unittest.TestCase):
+class EarlyFloor(_EarlyOn):
     def test_minus_110_is_below_the_floor(self):
         from betscan.efficiency.model import RatingSet, TeamRating
         from betscan.ncaab.live import early_signal
@@ -184,3 +195,18 @@ class PlayKind(unittest.TestCase):
         c.signals = [Sig("ncaab_model", "totals", "Over", 0.0,
                          "model total 162.0 (...): Over 155.5 is 6.5 pts off the model -> grade A, backtested ...")]
         self.assertEqual(play_kind(c), "ncaab_model")
+
+
+class EarlyOff(unittest.TestCase):
+    def test_off_by_default(self):
+        from betscan.efficiency.model import RatingSet, TeamRating
+        from betscan.ncaab.live import EARLY_ENABLED, early_signal
+        self.assertFalse(EARLY_ENABLED)
+        g, r = Signal._setup(Signal(), 2)
+        for b in g.books.values():
+            b["totals"] = [Outcome("Over", -105, 140.5), Outcome("Under", -115, 140.5)]
+        tv = RatingSet("ncaab", "t", "per_poss", {
+            "Home U": TeamRating("Home U", 120, 110, 72), "Away U": TeamRating("Away U", 118, 112, 72)},
+            league_off=105, league_pace=68)
+        cands = {(c.market, c.side): c for c in price_candidates(g, ("draftkings", "fanduel"))}
+        self.assertIsNone(early_signal(g, cands, r, NameIndex(r.o), tv, 11))

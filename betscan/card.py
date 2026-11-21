@@ -24,8 +24,6 @@ REFERENCE = [
      "59.4% / 60.5%", "2008-14 / 2015-21, 1,111 bets; ~59% half a point late", "52.4%"),
     ("Totals model, B", "Same, 3-6 pts off; only near the opener",
      "54.3% / 55.1%", "2008-14 / 2015-21, 5,658 bets; ~53% half a point late", "52.4%"),
-    ("Early totals", "November only: Torvik total 3+ pts off, before teams have 10 games",
-     "54.8%", "2015-20, 1,428 bets; 53.0% in 2018-20, ~52% half a point late", "52.4%"),
     ("Teaser legs", "NFL 6-pt, dogs +1.5 to +2.5, total 48.5 or lower", "78.3%", "2006-25, 563 legs",
      "73.9% at -120"),
     ("Wind under", "NFL outdoor, 15+ mph at kickoff", "56.4%", "2006-25 vs closing totals, 459 games", "52.4%"),

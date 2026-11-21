@@ -163,6 +163,10 @@ def totals_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, moved: fl
 # User-requested, deliberately marginal. Torvik's total 3+ pts off the opener in November
 # won 54.8% (1,428 bets, 2015-20) but only 53.0% in 2018-20, and ~52% half a point late;
 # December was 51.0%. So: November only, small fixed stakes, tracked as its own play.
+# Turned off 2026-11-20 at the user's request: after ~10 bets each, early plays beat the
+# closing line 4 of 10 times (consistent with the backtest's near break-even), while price
+# edges beat it 5 of 7. Set True to turn them back on.
+EARLY_ENABLED = False
 EARLY_RATE = 0.53
 EARLY_MIN_EDGE = 3.0
 EARLY_STAKE_PCT = 0.005
@@ -170,7 +174,7 @@ EARLY_MIN_EV = 0.013   # user's floor: nothing under 1.3% edge (at 53% that mean
 
 
 def early_signal(game: Game, cands: dict, r: Ratings, idx: NameIndex, torvik, when_et_month: int) -> Signal | None:
-    if game.sport != "ncaab" or r is None or torvik is None or when_et_month != 11:
+    if not EARLY_ENABLED or game.sport != "ncaab" or r is None or torvik is None or when_et_month != 11:
         return None
     h, a = idx.find(game.home), idx.find(game.away)
     if not h or not a or min(r.games.get(h, 0), r.games.get(a, 0)) >= MIN_GAMES:
