@@ -9,6 +9,7 @@ and publishes the updated copy with the new card.
 from __future__ import annotations
 
 import base64
+import gzip
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -23,15 +24,17 @@ def export(home: Path, out: Path) -> dict:
         con = sqlite3.connect(db)
         con.execute("VACUUM")
         con.close()
-    files = {n: base64.b64encode((home / n).read_bytes()).decode() for n in FILES if (home / n).exists()}
-    doc = {"version": 1, "saved_at": datetime.now(timezone.utc).isoformat(), "files": files}
+    raw = {n: (home / n).read_bytes() for n in FILES if (home / n).exists()}
+    # v2: each file gzipped before base64, so the page attachment stays well under 16 MB.
+    files = {n: base64.b64encode(gzip.compress(b, 9)).decode() for n, b in raw.items()}
+    doc = {"version": 2, "saved_at": datetime.now(timezone.utc).isoformat(), "files": files}
     out.write_text(json.dumps(doc))
-    return {n: len(base64.b64decode(v)) for n, v in files.items()}
+    return {n: len(b) for n, b in raw.items()}
 
 
 def import_(src: Path, home: Path) -> dict:
     doc = json.loads(src.read_text())
-    if doc.get("version") != 1:
+    if doc.get("version") not in (1, 2):
         raise ValueError(f"unknown state version {doc.get('version')}")
     home.mkdir(parents=True, exist_ok=True)
     sizes = {}
@@ -39,6 +42,8 @@ def import_(src: Path, home: Path) -> dict:
         if name not in FILES:
             continue   # never write anything but the known state files
         data = base64.b64decode(b64)
+        if doc["version"] == 2:
+            data = gzip.decompress(data)
         (home / name).write_bytes(data)
         sizes[name] = len(data)
     return sizes

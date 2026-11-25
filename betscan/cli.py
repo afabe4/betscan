@@ -28,6 +28,13 @@ SPORT_REGIONS = {"nfl": "us,eu", "ncaab": "us,eu"}   # eu brings Pinnacle, the s
 SPORT_HOURS = {"nfl": 168, "ncaab": 36}
 
 
+def _kept_books(st):
+    """Books worth saving in line history: the ones you bet at plus the sharp references.
+    Saving every EU book roughly doubled the history for no benefit."""
+    from .config import SHARP_BOOKS, US_REGULATED
+    return None if st.bet_books is None else set(st.bet_books) | set(SHARP_BOOKS) | set(US_REGULATED)
+
+
 def _log(m):
     print(m, file=sys.stderr)
 
@@ -159,7 +166,7 @@ def scan(a, p) -> int:
             _log(f"  odds unavailable for {code}: {e}")
             continue
         if store:
-            store.record_lines(games, now)
+            store.record_lines(games, now, keep_books=_kept_books(st))
         if a.lines_only:
             _log(f"  [lines-only] recorded {len(games)} games")
             continue

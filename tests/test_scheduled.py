@@ -84,3 +84,21 @@ class StatsExport(unittest.TestCase):
         self.assertEqual((r["clv_pct"], r["edge_pct"]), (-3.0, 2.0))
         pend = rows_from([{**base, "result": None, "profit": None, "clv": None, "tier": "BET", "kinds": ""}])[0]
         self.assertEqual((pend["status"], pend["dollars"], pend["play"]), ("Pending", None, "Price edge"))
+
+
+class StateV2(unittest.TestCase):
+    def test_compressed_roundtrip_and_reads_v1(self):
+        import base64
+        from betscan.state import export, import_
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            (Path(a) / "latest_ncaab.json").write_text('{"bets": []}' + " " * 5000)
+            export(Path(a), Path(a) / "s.json")
+            doc = json.loads((Path(a) / "s.json").read_text())
+            self.assertEqual(doc["version"], 2)
+            self.assertLess(len(doc["files"]["latest_ncaab.json"]), 200)      # compressed
+            import_(Path(a) / "s.json", Path(b))
+            self.assertTrue((Path(b) / "latest_ncaab.json").read_text().startswith('{"bets": []}'))
+            v1 = {"version": 1, "files": {"latest_ncaab.json": base64.b64encode(b'{"bets": [1]}').decode()}}
+            (Path(a) / "v1.json").write_text(json.dumps(v1))
+            import_(Path(a) / "v1.json", Path(b))
+            self.assertEqual((Path(b) / "latest_ncaab.json").read_text(), '{"bets": [1]}')

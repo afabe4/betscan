@@ -46,10 +46,12 @@ class Store:
         self.db.executescript(SCHEMA)
 
     # --- lines ---------------------------------------------------------------
-    def record_lines(self, games, ts: datetime):
+    def record_lines(self, games, ts: datetime, keep_books=None):
         rows = []
         for g in games:
             for book, markets in g.books.items():
+                if keep_books is not None and book not in keep_books:
+                    continue
                 for mkey, outcomes in markets.items():
                     for o in outcomes:
                         rows.append((ts.isoformat(), g.id, g.sport, g.label, g.commence.isoformat(),

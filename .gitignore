@@ -3,6 +3,6 @@ __pycache__/
 *.json
 card.html
 data/http/
-!data/latest_*.json
-!data/card.html
-!data/state.json
+# Scheduled runs keep state beside the bet card page, not in git.
+data/*
+!data/README.md

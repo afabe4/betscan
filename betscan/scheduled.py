@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-KEEP_LINES_DAYS = 14   # line history needed for openers/closes of recent games only
+KEEP_LINES_DAYS = 3    # games are graded (CLV + result) the morning after; older lines aren't needed
 
 
 def _bets(path: Path) -> list[dict]:
@@ -28,12 +28,15 @@ def _key(b: dict) -> tuple:
     return (b["game"], b["market"], b["side"])
 
 
-def prune(db_path: Path, now: datetime) -> int:
+def prune(db_path: Path, now: datetime, keep_books=None) -> int:
     if not db_path.exists():
         return 0
     db = sqlite3.connect(db_path)
     cut = (now - timedelta(days=KEEP_LINES_DAYS)).isoformat()
     n = db.execute("DELETE FROM lines WHERE commence < ?", (cut,)).rowcount
+    if keep_books:
+        marks = ",".join("?" * len(keep_books))
+        n += db.execute(f"DELETE FROM lines WHERE book NOT IN ({marks})", sorted(keep_books)).rowcount
     db.commit()
     db.execute("VACUUM")
     db.close()
@@ -76,7 +79,8 @@ def run(argv: list[str]) -> int:
         review_run(Store(st.db_path), Fetcher(st.cache_dir), now)
     except Exception as e:  # noqa: BLE001 - grading can wait for the next run
         print(f"  [review] skipped: {e}", file=sys.stderr)
-    pruned = prune(st.db_path, now)
+    from .cli import _kept_books
+    pruned = prune(st.db_path, now, _kept_books(st))
     a.card.write_text(render(st, now))
 
     current = [b for c in codes for b in _bets(st.cache_dir / f"latest_{c}.json")]
